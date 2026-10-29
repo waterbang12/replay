@@ -42,6 +42,20 @@ Each entry says what changed and why it was needed.
 - **"Set up iPhone" window** shows the endpoint URL (read from Tailscale) and the `Bearer` token with Copy buttons,
   plus a QR code of the token. Tray menu renamed to "iPhone app tracking".
 
+### Known issues: iPhone integration not done
+The Windows side is implemented and tested. The iPhone side has **not been set up or tested on a real device**.
+Until it is, the iPhone lane only contains test data sent with `curl`.
+- Not done:
+  - Tailscale on the PC (MagicDNS + HTTPS, `tailscale serve`) and on the iPhone;
+  - the "LifeReplay Log" shortcut and the per-app automations;
+  - the real-device test from docs/iphone-shortcuts.md, including offline resend;
+  - a comparison of one day against Screen Time.
+- Unknown until tested on a device:
+  - whether "Is Closed" fires on lock or when switching through the app switcher;
+  - whether "Append to Text File" exists on the current iOS, and whether the Korean action names match;
+  - whether a failed request (PC off) shows a notification on every run;
+  - whether a multi-app automation can tell which app triggered it.
+
 ## 0.3.1 — 2026-10-29
 
 ### Added

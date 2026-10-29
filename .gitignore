@@ -14,3 +14,8 @@ status.json
 device-id.txt
 sync/
 
+
+# Secrets (LifeReplay reads the API key from %LOCALAPPDATA%\LifeReplay\secrets.json, outside the repo)
+secrets.json
+.env
+*.key
