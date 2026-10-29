@@ -12,7 +12,8 @@ Each entry says what changed and why it was needed.
   *Why:* the Plan view's ahead/behind counted time in apps. Time isn't progress, and the coach is meant to track
   what was actually done.
 - **Optional AI suggestions** (morning plan, check-in, end-of-day review) over the OpenAI Responses API with
-  strict structured output. Tested with BAZE (`gpt-6-astra`).
+  strict structured output. Tested with BAZE: `gpt-6-astra` cost about 28–31 credits per request (5 of them for
+  BAZE's masking pass), so the default model is `gpt-5.4-mini`, which was faster and passed validation the same way.
   - **Before sending:** a preview of the exact payload, and nothing is sent without a click.
   - **Checks on the answer:** cited evidence must exist, every number must appear in the data, a counterpoint is
     required, and actions are limited. A failing answer gets one retry with the reasons, then the rule-based

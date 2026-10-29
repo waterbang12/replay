@@ -161,18 +161,35 @@ or stored anywhere else.
 
 ## Costs
 
-- **BAZE:** charges per request in credits, and `creditsPerRequest` (default 5) should match what your gateway
-  charges.
-- **Budget caps** (in `coach.json`): `monthlyCreditCap` (default 600) and `dailyRequestCap` (default 8 attempts).
-  A request that would go over either is not sent, and you get the rule-based suggestion instead.
-- **Typical use:** morning plan + one check + end-of-day review is 3 requests (15 credits) a day, about 450 a month.
-  Retries cost the same again.
-- **Measured on 2026-10-29:**
-  - request size: about 3.5–3.9 KB of payload;
-  - response time: 10–11 s with `gpt-6-astra`;
-  - cost: 5 credits each, as configured; BAZE's actual charge wasn't checked against the account.
-- **Your own OpenAI key instead:** set `baseUrl` to `https://api.openai.com/v1` and pick a model. Each request is
-  roughly 1.5–2k input and 0.3–1k output tokens.
+BAZE bills each request in two parts. These are the measured numbers from the billing history, 2026-10-29:
+
+| Part | Credits |
+|---|---|
+| `mindlogic-masking` (BAZE's personal-data masking, every request) | 5.00 flat |
+| `gpt-6-astra`, coach check (≈3.5 KB context) | 22.52 |
+| `gpt-6-astra`, end-of-day review (≈3.9 KB context) | 26.35 |
+| `gpt-6-astra`, a one-line test | 0.31 |
+
+So a coach request costs about **28–31 credits** with `gpt-6-astra`. The default is therefore **`gpt-5.4-mini`**:
+a real coach check answered in 5 s (Astra took about 10 s) and passed validation on the first try, with grounded
+evidence and a real counterpoint. Its cost is the 5-credit masking charge plus a small model charge; check your BAZE
+history and set `creditsPerRequest` to match (default 10, deliberately cautious).
+
+- **Budget caps** (in `coach.json`):
+  - `creditsPerRequest`: default 10. The coach counts this much per attempt.
+  - `monthlyCreditCap`: default 600, about 60 requests at 10 credits.
+  - `dailyRequestCap`: default 8 attempts.
+
+  A request that would exceed a cap isn't sent; you get the rule-based suggestion instead. Retries cost the same again.
+- **Typical use:** 3 requests a day (morning, check, review) is about 2,700 credits a month with Astra. With mini
+  it is about 15–30 credits a day, depending on the model charge; raise `monthlyCreditCap` if you use it daily.
+- **To spend less:**
+  - stay on `gpt-5.4-mini` (switch `model` to `gpt-6-astra` only for an occasional deep review); the masking charge
+    (5) stays the same either way;
+  - make fewer requests (only the end-of-day review);
+  - use the free ChatGPT copy/paste bridge for long discussions.
+- **Your own OpenAI key instead:** set `baseUrl` to `https://api.openai.com/v1`. There's no masking charge, and you pay
+  per token (roughly 1.5–2k input and 0.3–1k output tokens per request).
 
 ## Database (schema v5)
 
@@ -235,9 +252,9 @@ dotnet test desktop\tests\LifeReplay.Tests
 
 ```json
 {
-  "enabled": false, "baseUrl": "https://api.baze.co/v1/gateway", "model": "gpt-6-astra", "reasoningEffort": "low",
+  "enabled": false, "baseUrl": "https://api.baze.co/v1/gateway", "model": "gpt-5.4-mini", "reasoningEffort": "low",
   "timeoutSeconds": 60, "retries": 1, "maxOutputTokens": 1200,
-  "creditsPerRequest": 5, "monthlyCreditCap": 600, "dailyRequestCap": 8,
+  "creditsPerRequest": 30, "monthlyCreditCap": 1500, "dailyRequestCap": 8,
   "notifications": false, "quietHours": "22:00-08:00", "cooldownMinutes": 60, "maxNotificationsPerDay": 3, "snoozeMinutes": 60,
   "redactTaskTitles": false, "includeCommitMessages": false
 }

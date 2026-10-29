@@ -14,7 +14,8 @@ public sealed class CoachConfig
     public bool Enabled { get; set; } = false;
     /// <summary>OpenAI-compatible base URL; requests go to {BaseUrl}/responses. Default: BAZE API Gateway.</summary>
     public string BaseUrl { get; set; } = "https://api.baze.co/v1/gateway";
-    public string Model { get; set; } = "gpt-6-astra";
+    /// <summary>gpt-5.4-mini: about half the time of gpt-6-astra and far cheaper; passed validation first try (2026-10-29).</summary>
+    public string Model { get; set; } = "gpt-5.4-mini";
     /// <summary>Reasoning effort sent to reasoning models (low keeps hidden reasoning tokens down). Empty = don't send.</summary>
     public string ReasoningEffort { get; set; } = "low";
     public int TimeoutSeconds { get; set; } = 60;
@@ -22,8 +23,10 @@ public sealed class CoachConfig
     public int Retries { get; set; } = 1;
     public int MaxOutputTokens { get; set; } = 1200;
 
-    // Budget (BAZE bills per request in credits; set CreditsPerRequest to what your gateway charges).
-    public int CreditsPerRequest { get; set; } = 5;
+    // Budget in BAZE credits. Measured 2026-10-29: each request = 5 (mindlogic-masking pass) + the model's token cost;
+    // a coach request with gpt-6-astra cost 27.5–31.4 in total. 10 is a cautious estimate for gpt-5.4-mini;
+    // set this to what your gateway history shows.
+    public int CreditsPerRequest { get; set; } = 10;
     public int MonthlyCreditCap { get; set; } = 600;
     public int DailyRequestCap { get; set; } = 8;
 
@@ -64,7 +67,7 @@ public sealed class CoachConfig
     {
         BaseUrl = (BaseUrl ?? "").Trim().TrimEnd('/');
         if (!Uri.TryCreate(BaseUrl, UriKind.Absolute, out var u) || u.Scheme != Uri.UriSchemeHttps) { BaseUrl = "https://api.baze.co/v1/gateway"; }
-        Model = string.IsNullOrWhiteSpace(Model) ? "gpt-6-astra" : Model.Trim();
+        Model = string.IsNullOrWhiteSpace(Model) ? "gpt-5.4-mini" : Model.Trim();
         ReasoningEffort = (ReasoningEffort ?? "").Trim().ToLowerInvariant();
         TimeoutSeconds = Math.Clamp(TimeoutSeconds, 5, 300);
         Retries = Math.Clamp(Retries, 0, 3);
