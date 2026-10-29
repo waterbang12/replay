@@ -141,6 +141,10 @@ public partial class MainWindow : Window
         var gaps = _store.GetGapsInRange(start, end);
         _timeline = DayTimeline.Build(start, end, now, segments, gaps, _store.GetDisplays(), _store.GetDevices());
         _timeline.Focus = _store.GetFocusInRange(start, end);
+        // iPhone app sessions: read a margin around the day so sessions crossing midnight pair up correctly.
+        _timeline.PhoneSessions = AppSessions.Reconstruct(_store.GetAppEvents(start - 86_400_000, end + 86_400_000))
+            .Where(s => s.EndUtcMs >= start && s.StartUtcMs < end).ToList();
+        _timeline.PhoneStatus = _store.GetAppEventStatus();
         UpdateSummary();
         _thumbs = _store.GetThumbnails(segments.Select(s => s.Id)).GroupBy(t => t.SegmentId).ToDictionary(g => g.Key, g => g.OrderBy(t => t.TsUtcMs).ToList());
         Timeline.Data = _timeline;

@@ -1,8 +1,6 @@
 ﻿using System.Collections.Concurrent;
 using System.Net;
 using System.Security.Cryptography.X509Certificates;
-using System.Text;
-using System.Text.Json;
 using LifeReplay.Core;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -13,14 +11,15 @@ using Microsoft.Extensions.Logging;
 namespace LifeReplay.Sync;
 
 /// <summary>
-/// Opt-in HTTPS endpoint that receives iPhone recordings on the local network.
+/// Opt-in HTTPS endpoint that receives iPhone app-usage events from Apple Shortcuts.
 /// Every request needs "Authorization: Bearer &lt;token&gt;" from pairing; there are no unauthenticated routes.
-/// Protocol: shared/sync-protocol.md.
+/// Usually reached through Tailscale Serve (trusted certificate, tailnet-only). Protocol: shared/sync-protocol.md.
 /// </summary>
 public sealed class SyncServer : IAsyncDisposable
 {
-    public const string MetadataHeader = "X-LifeReplay-Metadata";
-    public const int ApiVersion = 1;
+    public const int ApiVersion = 2;
+    /// <summary>Plenty for a long offline queue (each event is ~200 bytes).</summary>
+    public const long MaxBodyBytes = 2 * 1024 * 1024;
 
     private readonly WebApplication _app;
     public int Port { get; }
@@ -31,15 +30,15 @@ public sealed class SyncServer : IAsyncDisposable
         _app = app; Port = port; Fingerprint = fingerprint;
     }
 
-    public static async Task<SyncServer> StartAsync(int port, X509Certificate2 certificate, PairingStore pairing, IngestService ingest,
-        AppPaths paths, string serverName, IPAddress? bindAddress = null)
+    public static async Task<SyncServer> StartAsync(int port, X509Certificate2 certificate, PairingStore pairing, MetadataStore store,
+        string serverName, IPAddress? bindAddress = null)
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { ContentRootPath = AppContext.BaseDirectory });
         builder.Logging.ClearProviders();
         builder.WebHost.ConfigureKestrel(k =>
         {
             k.AddServerHeader = false;
-            k.Limits.MaxRequestBodySize = 4L * 1024 * 1024 * 1024;
+            k.Limits.MaxRequestBodySize = MaxBodyBytes;
             k.Listen(bindAddress ?? IPAddress.Any, port, o =>
             {
                 o.Protocols = HttpProtocols.Http1AndHttp2;
@@ -60,7 +59,7 @@ public sealed class SyncServer : IAsyncDisposable
                 return;
             }
             var auth = ctx.Request.Headers.Authorization.ToString();
-            var token = auth.StartsWith("Bearer ", StringComparison.Ordinal) ? auth[7..].Trim() : null;
+            var token = auth.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase) ? auth[7..].Trim() : null;
             if (!pairing.Validate(token))
             {
                 failures.AddOrUpdate(ip, _ => (1, now), (_, old) => now - old.WindowStart > 600_000 ? (1, now) : (old.Count + 1, old.WindowStart));
@@ -74,48 +73,22 @@ public sealed class SyncServer : IAsyncDisposable
 
         app.MapGet("/api/v1/hello", () => Results.Json(new { server = serverName, apiVersion = ApiVersion }));
 
-        app.MapPut("/api/v1/segments/{id}", async (HttpContext ctx, string id) =>
+        // One event (JSON object), several (JSON array), or the Shortcuts queue file (one JSON object per line).
+        app.MapPost("/api/v1/app-events", async (HttpContext ctx) =>
         {
-            IngestSegmentMetadata? meta;
+            string body;
             try
             {
-                var raw = ctx.Request.Headers[MetadataHeader].ToString();
-                var json = Encoding.UTF8.GetString(Convert.FromBase64String(raw));
-                meta = JsonSerializer.Deserialize<IngestSegmentMetadata>(json, RecorderConfig.JsonOptions);
+                using var reader = new StreamReader(ctx.Request.Body);
+                body = await reader.ReadToEndAsync(ctx.RequestAborted);
             }
-            catch { meta = null; }
-            if (meta == null || meta.SegmentId != id) return Results.BadRequest(new { error = $"missing or invalid {MetadataHeader} header" });
-            var reject = IngestService.Validate(meta, TimeUtil.NowMs());
-            if (reject != null) return Results.BadRequest(new { error = reject });
-
-            Directory.CreateDirectory(paths.IncomingDir);
-            var temp = Path.Combine(paths.IncomingDir, $"{Guid.NewGuid():N}.upload");
-            await using (var fs = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None, 1 << 16, useAsync: true))
-                await ctx.Request.Body.CopyToAsync(fs, ctx.RequestAborted);
-            var result = ingest.IngestSegment(meta, temp);
-            return result.Outcome switch
-            {
-                IngestOutcome.Created => Results.Json(new { status = "created", id }, statusCode: 201),
-                IngestOutcome.AlreadyExists => Results.Json(new { status = "exists", id }),
-                _ => Results.UnprocessableEntity(new { error = result.Message }),
-            };
-        });
-
-        app.MapPut("/api/v1/segments/{id}/thumbnails/{ts:long}", async (HttpContext ctx, string id, long ts) =>
-        {
-            using var ms = new MemoryStream();
-            await ctx.Request.Body.CopyToAsync(ms, ctx.RequestAborted);
-            var r = ingest.IngestThumbnail(id, ts, ms.ToArray());
-            return r.Outcome == IngestOutcome.Rejected ? Results.UnprocessableEntity(new { error = r.Message }) : Results.Json(new { status = "created" }, statusCode: 201);
-        });
-
-        app.MapPost("/api/v1/devices/{deviceId}/gaps", async (HttpContext ctx, string deviceId) =>
-        {
-            List<IngestGap>? gaps;
-            try { gaps = await JsonSerializer.DeserializeAsync<List<IngestGap>>(ctx.Request.Body, RecorderConfig.JsonOptions, ctx.RequestAborted); }
-            catch (JsonException ex) { return Results.BadRequest(new { error = "invalid JSON: " + ex.Message }); }
-            var r = ingest.IngestGaps(deviceId, gaps ?? []);
-            return r.Outcome == IngestOutcome.Rejected ? Results.BadRequest(new { error = r.Message }) : Results.Json(new { status = r.Message });
+            catch (Microsoft.AspNetCore.Http.BadHttpRequestException) { return Results.StatusCode(StatusCodes.Status413PayloadTooLarge); }
+            var r = AppEvents.Ingest(store, body, TimeUtil.NowMs());
+            Log.Info($"Sync: app events from {ctx.Connection.RemoteIpAddress}: {r.Accepted} new, {r.Duplicates} duplicate, {r.Errors.Count} rejected" +
+                     (r.Errors.Count > 0 ? $" (first: {r.Errors[0]})" : ""));
+            var payload = new { accepted = r.Accepted, duplicates = r.Duplicates, rejected = r.Errors.Count, errors = r.Errors.Take(20) };
+            // 200 if anything was usable (so the phone clears its queue); 400 only when nothing in the body was valid.
+            return r.Accepted + r.Duplicates == 0 && r.Errors.Count > 0 ? Results.Json(payload, statusCode: 400) : Results.Json(payload);
         });
 
         await app.StartAsync();

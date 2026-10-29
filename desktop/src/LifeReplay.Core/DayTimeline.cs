@@ -60,6 +60,25 @@ public sealed class DayTimeline
     /// <summary>Which app/window was in front (window-title log), sorted by start.</summary>
     public List<FocusRecord> Focus { get; set; } = [];
 
+    /// <summary>iPhone app sessions rebuilt from Shortcuts events (see <see cref="AppSessions"/>), sorted by start.</summary>
+    public List<AppSession> PhoneSessions { get; set; } = [];
+    /// <summary>Last time an iPhone event arrived / total events, for the sync-status indicator.</summary>
+    public (long? LastReceivedUtcMs, long? LastEventUtcMs, int Count) PhoneStatus { get; set; }
+
+    /// <summary>The phone session under time t; zero-length (Unknown) sessions match within <paramref name="toleranceMs"/>.</summary>
+    public AppSession? PhoneSessionAt(long t, long toleranceMs)
+    {
+        AppSession? best = null;
+        long bestDist = long.MaxValue;
+        foreach (var s in PhoneSessions)
+        {
+            long dist = t < s.StartUtcMs ? s.StartUtcMs - t : t > s.EndUtcMs ? t - s.EndUtcMs : 0;
+            if (s.HasDuration && dist == 0) return s;
+            if (dist <= toleranceMs && dist < bestDist) { best = s; bestDist = dist; }
+        }
+        return best;
+    }
+
     public FocusRecord? FocusAt(long t)
     {
         int lo = 0, hi = Focus.Count - 1, found = -1;

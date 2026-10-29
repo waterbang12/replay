@@ -109,6 +109,22 @@ public static class Migrations
                 created_utc INTEGER NOT NULL
             );
             """),
+        (4, """
+            CREATE TABLE app_events (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                device_id    TEXT NOT NULL,
+                source       TEXT NOT NULL,
+                app          TEXT NOT NULL,
+                event_type   TEXT NOT NULL CHECK (event_type IN ('opened', 'closed')),
+                ts_utc       INTEGER NOT NULL,
+                tz_offset    INTEGER NOT NULL,
+                event_id     TEXT NOT NULL,
+                id_derived   INTEGER NOT NULL DEFAULT 0,
+                received_utc INTEGER NOT NULL,
+                UNIQUE (device_id, event_id)
+            );
+            CREATE INDEX ix_app_events_ts ON app_events(ts_utc);
+            """),
     ];
 
     public static int LatestVersion => All[^1].Version;

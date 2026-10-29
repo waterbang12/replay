@@ -4,9 +4,10 @@ Test machine: Windows 11 Home 10.0.26200, Intel Arc integrated GPU (hardware H.2
 one 1920×1200 monitor, .NET 10.0.403 SDK. All results below are from real runs on this machine on 2026-10-27.
 Nothing here is simulated, except that `curl` stood in for the iPhone.
 
-## Automated tests: 47 passed, 0 failed
+## Automated tests: 101 passed, 0 failed (2026-10-29)
 
-`dotnet test desktop\tests\LifeReplay.Tests` (also run by `build.ps1`):
+`dotnet test desktop\tests\LifeReplay.Tests` (also run by `build.ps1`). The table below lists the original areas
+plus the iPhone app-event tests; the topic/plan analysis tests are described in the CHANGELOG.
 
 | Area | Tests |
 |---|---|
@@ -19,9 +20,10 @@ Nothing here is simulated, except that `curl` stood in for the iPhone.
 | Retention: age, quota, never deletes the live segment, files + rows removed | 4 |
 | Crash recovery: lost segment + gap + session, completed-but-unrecorded file, idempotent | 3 |
 | Timeline: segment lookup, gaps, lost not playable, inactive skipping, multi-screen, lane order | 6 |
-| iPhone ingest: stored, duplicate, corrupted, path tricks | 5 |
+| iPhone app events: timestamp normalization (offsets, ms, `+0900`), no-offset rejected, object/array/JSON Lines, dedupe by id and by derived id, per-line errors (bad device id, type, future, too old, not JSON), Shortcuts wording | 12 |
+| iPhone sessions: normal + switching, out-of-order input = same result, close/open in the same second, missing close (near → inferred, far → unknown), missing open, double trigger + duplicate open, still open, cross-midnight split, known/inferred/unknown totals, per device, phone clock ahead, overlap with Windows | 13 |
 | Pairing tokens (hash only, revoke) | 1 |
-| HTTPS sync server: 401 without/with wrong token, upload 201, retry 200, gaps; client rejects unpinned cert | 2 |
+| HTTPS server: 401 without/with wrong token, event stored, queue resend → 1 new + 1 duplicate, all-invalid → 400 with reason; client rejects unpinned cert | 2 |
 
 ## End-to-end tests on the real desktop
 
@@ -67,8 +69,8 @@ Final build, started 11:45. The PC turned its display off and went into Modern S
 | Restart keeps history | The viewer shows recordings from before and after the restart on the same timeline. |
 | Tray mode + command channel | `--pause` → status `paused`, `paused` gap; `--resume` → new session; `--shutdown` → files closed, `stopped` gap (closed on next start). |
 | Privacy blanking | A window titled "…InPrivate…" triggered blanking within milliseconds (it never appeared in the video). `--blank`/`--unblank`: decoded frames are black exactly inside the 8.9–17.1 s window (content at 8.8 s and 17.2 s). |
-| Viewer | Date selection, timeline with gaps and reasons, jump to time, 1×/4×/16× (16× for 3 s advanced 48 s across a segment boundary with video showing), skip inactive (2.5 s of playback skipped 22 s of idle time), Windows + iPhone lanes side by side, delete segment through the UI (file and rows removed). Driven with UI Automation plus window screenshots. |
-| iPhone path (Windows side) | Real recorder with sync on (loopback): 401 for no/wrong token, upload 201, duplicate 200, thumbnail 201, gaps 200, bad JSON 400, TLS 1.3, certificate fingerprint matches the one logged for pairing. The segment shows up in an iPhone lane in the viewer. |
+| Viewer | Date selection, timeline with gaps and reasons, jump to time, 1×/4×/16× (16× for 3 s advanced 48 s across a segment boundary with video showing), skip inactive (2.5 s of playback skipped 22 s of idle time), delete segment through the UI (file and rows removed). Driven with UI Automation plus window screenshots. |
+| iPhone app events (Windows side, 2026-10-29) | Debug recorder with its own data folder, tracking enabled on 127.0.0.1:47811. Fresh DB migrated to v4. With `curl.exe` as the phone: no token → 401, wrong token → 401, `/hello` → 200; the spec's example event → `accepted 1`; a 9-line JSON Lines queue (out of order, one repeated event, one missing close, one timestamp without offset) → `7 new, 1 duplicate, 1 rejected` with the reason; the same queue again → `0 new, 8 duplicate`; a 3 MB body → 413. Each request logged. Viewer on that folder: iPhone lane with solid, hatched-inferred and unknown markers, sync status "synced 15:11"; Summary → iPhone shows per-app totals (YouTube marked inferred, Safari "+1 incomplete"), 2 missing-event sessions, and the combined block. Hover popup not captured (the viewer couldn't be brought to the front). |
 | Software H.264 encoder | `--software-encoder` for 40 s: 3 valid, decodable segments (`mf-h264-sw`), about 1.9% CPU of the whole machine vs about 0.3% with the GPU encoder. |
 | Self-contained publish | `dist\LifeReplay\LifeReplay.exe` records and verifies with no .NET installed system-wide. |
 
@@ -76,7 +78,7 @@ Final build, started 11:45. The PC turned its display off and went into Modern S
 
 | Item | Reason |
 |---|---|
-| iOS app and broadcast extension | No Mac/Xcode/Apple developer account. The code has never been compiled. |
+| Shortcuts automations on a real iPhone, Tailscale Serve, iOS network permission prompt, Screen Time comparison | No device test was done. Procedure: docs/iphone-shortcuts.md → "Test on a real device". |
 | Multiple monitors, monitor hot-plug, resolution change during recording | Only one monitor attached. The code path is per-monitor (one pipeline per display) and handles `DisplaySettingsChanged` / WGC `Closed`. |
 | Automatic switch to software after hardware failures | The hardware encoder never failed. The software path itself was tested by forcing it (see above). |
 | Start with Windows, RegisterApplicationRestart | Would change the user's login items / need a real crash after 60 s. |

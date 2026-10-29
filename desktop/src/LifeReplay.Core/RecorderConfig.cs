@@ -153,9 +153,12 @@ public sealed class RecordingHours
 
 public sealed class SyncSettings
 {
-    /// <summary>Off by default. When on, an HTTPS endpoint (token auth, pinned self-signed cert) accepts iPhone uploads.</summary>
+    /// <summary>Off by default. When on, an HTTPS endpoint (token auth) accepts iPhone app-usage events from Shortcuts.</summary>
     public bool Enabled { get; set; } = false;
     public int Port { get; set; } = 47800;
-    /// <summary>Address to listen on. 0.0.0.0 = all networks (the PC's firewall still applies).</summary>
-    public string BindAddress { get; set; } = "0.0.0.0";
+    /// <summary>
+    /// Address to listen on. 127.0.0.1 (default) = reachable only through Tailscale Serve on this PC, which is
+    /// the supported setup; 0.0.0.0 = all networks (the PC's firewall still applies).
+    /// </summary>
+    public string BindAddress { get; set; } = "127.0.0.1";
 }

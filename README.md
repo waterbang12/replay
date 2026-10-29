@@ -1,17 +1,18 @@
 # LifeReplay
 
-Continuous, local-first screen recording for Windows (plus an iPhone companion), with a DVR-style replay
+Continuous, local-first screen recording for Windows (plus iPhone app-usage tracking), with a DVR-style replay
 timeline for looking back at your day.
 
 - **Recorder** (`LifeReplay.exe`): tray app that records every monitor in 5-minute H.264 MP4 segments using
   Windows.Graphics.Capture and the GPU's hardware encoder. 10 fps, 1080p, about 560 MB per hour per monitor by default.
 - **Viewer** (`LifeReplay.Viewer.exe`): pick a day, see every screen on one timeline, play at 1–16×, scrub with
   thumbnail previews, jump to a time, skip gaps and idle stretches, delete recordings.
-- **iPhone** (`ios/`): ReplayKit broadcast extension + app that syncs segments to the PC over Wi‑Fi.
-  Written but **not built or tested** (no Mac available). See [docs/ios.md](docs/ios.md).
+- **iPhone app usage** (no iPhone app needed): Apple Shortcuts automations ("App is opened / closed") send small
+  events to the recorder, and the viewer shows an iPhone lane and per-app totals next to your Windows time.
+  No screen recording on the iPhone. Setup: [docs/iphone-shortcuts.md](docs/iphone-shortcuts.md).
 
-Everything stays on your PC. Nothing is uploaded anywhere, and iPhone sync (local network only, encrypted,
-paired) is off until you enable it.
+Everything stays on your PC. Nothing is uploaded to any cloud service. iPhone app tracking (HTTPS, token, reachable
+only through your own Tailscale network) is off until you enable it.
 
 ## Status
 
@@ -26,10 +27,12 @@ paired) is off until you enable it.
 | Retention & quota, disk-low pause | ✅ Retention logic unit-tested; ⚠️ disk-low pause not exercised |
 | Privacy blanking (excluded apps/titles, manual `--blank`) | ✅ Verified: title match triggered blanking; decoded frames are black exactly during the blank window |
 | Auto-start with Windows, restart after crash | ⚠️ Implemented (Run key, RegisterApplicationRestart), not exercised |
-| Replay viewer: date, timeline, seek, jump, 1–16×, multi-screen, iPhone lane | ✅ Verified (UI Automation + screenshots) |
+| Replay viewer: date, timeline, seek, jump, 1–16×, multi-screen | ✅ Verified (UI Automation + screenshots) |
 | Thumbnail hover preview | ⚠️ Thumbnails generated and verified on disk; hover popup not exercised (needs a real mouse) |
-| iPhone sync server (HTTPS, pinning, token, ingest) | ✅ Unit + end-to-end tested with `curl` as the phone |
-| iPhone app / broadcast extension | ❌ Not compiled: needs macOS + Xcode (see docs/ios.md) |
+| iPhone app-usage endpoint (HTTPS, token, validation, dedupe, offline queue format) | ✅ Unit tests + end-to-end with `curl` against the real recorder |
+| iPhone session reconstruction (missing/duplicate/out-of-order events, midnight) | ✅ Unit tested |
+| iPhone lane + "iPhone" summary in the viewer | ✅ Verified with events sent by `curl` (screenshot); hover popup not exercised |
+| Shortcuts automations on a real iPhone, Tailscale Serve | ❌ **Not tested on a device** — follow the test procedure in docs/iphone-shortcuts.md |
 
 Full test log with numbers: [docs/testing.md](docs/testing.md). Design: [docs/architecture.md](docs/architecture.md).
 
@@ -64,7 +67,7 @@ desktop\bin\Debug\LifeReplay.Viewer.exe --data-dir C:\temp\lr-test
 ## Using it
 
 **Tray menu:** status, storage used, pause / resume / pause 15 min / pause 1 h, black out video, open replay, open recordings
-folder, settings, start with Windows, iPhone sync (enable, pair, revoke), logs, exit.
+folder, settings, start with Windows, iPhone app tracking (enable, set up, revoke), logs, exit.
 
 **Tray icon** (the recording indicator): red dot = recording · red with black square = recording, video blanked
 for privacy · grey pause = paused · orange = problem (hover for details).
@@ -87,9 +90,15 @@ LifeReplay.Viewer.exe [--data-dir <path>] [--date 2026-10-27] [--time 14:30]
 **Viewer keys:** Space play/pause · ←/→ ±10 s (Shift ±1 min) · PgUp/PgDn previous/next recording · ↑/↓ speed ·
 F5 refresh · mouse wheel on the timeline = zoom, Shift+wheel or right-drag = pan, click/drag = seek.
 
-On the timeline, blue = Windows recording, green = iPhone, purple = still being written, red = lost/corrupt,
+On the timeline, blue = Windows recording, purple = still being written, red = lost/corrupt,
 darker stripes = nothing changed on screen, red hatching = gap (labelled with the reason when known: paused,
 locked, sleep, display off, private app, recorder not running, crash…).
+
+The **📱 iPhone apps** lane (once any iPhone event has arrived) shows one colour per app: solid = both "opened" and
+"closed" were received, faded + hatched = one end was inferred, a dashed line with a red dot = only one event is
+known (duration unknown, not counted). Its label shows when the phone last synced (⚠ after 12 h of silence). Hover a
+block for start, end, duration, source and confidence. **Summary → iPhone** shows per-app totals, missing events, and
+Windows + iPhone combined (including time when both were in use).
 
 ## What did I work on? (Summary → Apps / Topics / Plan)
 
@@ -154,7 +163,7 @@ Changes are applied automatically when the file is saved (or via tray → Reload
 | `hours.enabled` / `hours.start` / `hours.end` / `hours.weekdaysOnly` | false / 09:00 / 18:00 / false | Only record during these local hours. |
 | `logWindowTitles` | true | Log which app and window title (tab / document / file) is in front, for the viewer's **Summary** panel and "Apps / tabs" timeline lane. Only while recording; excluded windows appear as "(private)". |
 | `idleMinutes` | 5 | No input and no screen change for this long isn't counted as time on an app. |
-| `sync.enabled` / `sync.port` / `sync.bindAddress` | false / 47800 / 0.0.0.0 | iPhone sync endpoint. |
+| `sync.enabled` / `sync.port` / `sync.bindAddress` | false / 47800 / 127.0.0.1 | iPhone app-usage endpoint. 127.0.0.1 = only reachable through Tailscale Serve on this PC. |
 
 ## Privacy and security
 
@@ -166,8 +175,9 @@ Changes are applied automatically when the file is saved (or via tray → Reload
   Apps that use `WDA_EXCLUDEFROMCAPTURE` are excluded by Windows itself.
 - Lock screen, UAC prompts and sleep are never recorded (Windows can't capture them, and LifeReplay pauses).
 - Delete by segment, session or day in the viewer; retention and quota clean up automatically.
-- iPhone sync: HTTPS only, certificate pinned by fingerprint, 256-bit pairing token (stored hashed on the PC),
-  upload-only API (recordings can't be downloaded over the network), off by default.
+- iPhone app tracking: off by default; listens on 127.0.0.1 only and is reached through Tailscale Serve (valid
+  HTTPS certificate, your tailnet only, never the public internet). Every request needs a 256-bit token, stored only
+  as a hash on the PC. The API can only *add* app events; recordings can't be read over the network.
   See [shared/sync-protocol.md](shared/sync-protocol.md).
 - Anyone with access to your Windows account can read the recordings. Use BitLocker / device encryption for
   protection at rest.
@@ -176,9 +186,8 @@ Changes are applied automatically when the file is saved (or via tray → Reload
 
 ```
 desktop/   Windows: Core, Sync, Recorder (tray), Viewer (WPF), Tests
-ios/       iPhone app + Broadcast Upload Extension (XcodeGen project.yml)
-shared/    sync protocol, metadata JSON schema
-docs/      architecture, testing, iOS
+shared/    iPhone event protocol
+docs/      architecture, testing, iPhone Shortcuts setup
 build.ps1  test + publish
 ```
 

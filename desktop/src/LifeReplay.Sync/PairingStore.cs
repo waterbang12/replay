@@ -7,7 +7,7 @@ namespace LifeReplay.Sync;
 
 /// <summary>
 /// Paired devices. Only a SHA-256 hash of each access token is stored; the token itself is shown once in the
-/// pairing QR code and kept by the phone in its Keychain.
+/// "Set up iPhone" window and pasted into the phone's Shortcuts.
 /// </summary>
 public sealed class PairingStore
 {

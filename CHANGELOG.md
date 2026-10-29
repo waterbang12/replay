@@ -2,6 +2,46 @@
 
 Each entry says what changed and why it was needed.
 
+## 0.4.0 — 2026-10-29
+
+### Removed
+- **The standalone iPhone app** (`ios/`: ReplayKit broadcast extension, segment upload, `docs/ios.md`, the
+  segment-metadata schema) and the segment/thumbnail/gap upload endpoints with their ingest code.
+  *Why:* it was never compiled (it needs a Mac and a developer account), and recording the phone's screen wasn't the
+  goal. Knowing which phone apps take time was. It also kept an upload API open that nothing used.
+
+### Added
+- **iPhone app-usage tracking through Apple Shortcuts.** Personal automations ("App is opened / is closed") call a
+  shared "LifeReplay Log" shortcut that POSTs `{device_id, source, app_name, event_type, timestamp, event_id}` to
+  the recorder. Setup: docs/iphone-shortcuts.md.
+  *Why:* Shortcuts is the only built-in way to react to app opens without an App Store app or Screen Time access.
+- **`POST /api/v1/app-events`** accepts one event, an array, or JSON Lines. Every event is validated (device id
+  charset, event type, ISO 8601 timestamp with offset, not in the future or older than 30 days) and deduplicated by
+  `(device, event_id)`. A missing id is derived from app, type and second.
+  *Why:* Shortcuts can't retry in the background, so the shortcut keeps a queue file and resends all of it. The
+  server must therefore accept batches and ignore repeats. Lines are checked one by one so a bad line can't block
+  the rest.
+- **Schema v4: `app_events` table**, cleaned up with the same retention as recordings.
+- **Session rebuilding** (`AppSessions`): deterministic rules for missing closes, missing opens, double triggers,
+  duplicate opens, out-of-order delivery, cross-midnight sessions and phone clock skew. Every session carries a
+  confidence: Complete, EndInferred, StartInferred or Unknown. Unknown sessions are never added to totals.
+  *Why:* automations sometimes don't fire, and the totals should say so rather than silently invent time. No language
+  model is involved: this is plain rule-based code, unit-tested case by case.
+- **Viewer:**
+  - a 📱 iPhone apps timeline lane, colour per app, with inferred and missing-event markers and the last-sync time
+    (⚠ after 12 h);
+  - hover details: start, end, duration, source and confidence;
+  - **Summary → iPhone**: per-app totals, a missing-events list, and Windows + iPhone combined (including overlap).
+  *Why:* to see phone time in the same place as PC time for the same day.
+
+### Changed
+- **The endpoint listens on 127.0.0.1 by default** and is reached through **Tailscale Serve**
+  (`tailscale serve --bg https+insecure://127.0.0.1:47800`).
+  *Why:* Shortcuts rejects self-signed certificates. Tailscale gives a trusted certificate that only your own devices
+  can reach, and nothing is exposed to the LAN or the internet.
+- **"Set up iPhone" window** shows the endpoint URL (read from Tailscale) and the `Bearer` token with Copy buttons,
+  plus a QR code of the token. Tray menu renamed to "iPhone app tracking".
+
 ## 0.3.1 — 2026-10-29
 
 ### Added

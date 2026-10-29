@@ -105,6 +105,7 @@ public static class RecordingDeleter
         {
             store.DeleteGapsBefore(nowMs - cfg.RetentionDays * 86_400_000L);
             store.DeleteFocusBefore(nowMs - cfg.RetentionDays * 86_400_000L);
+            store.DeleteAppEventsBefore(nowMs - cfg.RetentionDays * 86_400_000L);
         }
         if (plan.Count == 0) return new Result(0, 0, 0);
         var r = DeleteSegments(store, paths, plan);

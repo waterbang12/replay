@@ -14,8 +14,3 @@ status.json
 device-id.txt
 sync/
 
-# Xcode
-ios/*.xcodeproj
-ios/build/
-DerivedData/
-xcuserdata/

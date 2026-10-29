@@ -10,72 +10,6 @@ using LifeReplay.Sync;
 
 namespace LifeReplay.Tests;
 
-public class IngestTests
-{
-    private static (IngestSegmentMetadata Meta, string File) Upload(TempData t, long start, long end)
-    {
-        var bytes = Mp4Builder.Build(end - start, 886, 1920);
-        var file = Path.Combine(t.Paths.DataDir, Guid.NewGuid() + ".upload");
-        File.WriteAllBytes(file, bytes);
-        var meta = new IngestSegmentMetadata
-        {
-            SegmentId = Guid.NewGuid().ToString(), SessionId = Guid.NewGuid().ToString(), DeviceId = Guid.NewGuid().ToString(),
-            DeviceName = "Test iPhone", StartUtcMs = start, EndUtcMs = end, Width = 886, Height = 1920, Fps = 15, FrameCount = 100,
-            Sha256 = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant(),
-        };
-        return (meta, file);
-    }
-
-    [Fact]
-    public void ValidSegmentIsStoredUnderIphoneFolder()
-    {
-        using var t = new TempData();
-        long now = TimeUtil.NowMs();
-        var (meta, file) = Upload(t, now - 60_000, now);
-        var r = new IngestService(t.Store, t.Paths).IngestSegment(meta, file);
-        Assert.Equal(IngestOutcome.Created, r.Outcome);
-        var seg = t.Store.GetSegment(meta.SegmentId)!;
-        Assert.Equal(SegmentStatus.Finalized, seg.Status);
-        Assert.Contains("/iphone/", seg.FilePath);
-        Assert.True(File.Exists(t.Paths.ToFull(seg.FilePath)));
-        Assert.Equal(Platforms.Ios, t.Store.GetDevice(meta.DeviceId)!.Platform);
-        Assert.False(File.Exists(file)); // temp file consumed
-    }
-
-    [Fact]
-    public void DuplicateUploadIsAcknowledged()
-    {
-        using var t = new TempData();
-        long now = TimeUtil.NowMs();
-        var svc = new IngestService(t.Store, t.Paths);
-        var (meta, file) = Upload(t, now - 60_000, now);
-        Assert.Equal(IngestOutcome.Created, svc.IngestSegment(meta, file).Outcome);
-        File.WriteAllBytes(file, Mp4Builder.Build(60_000, 886, 1920));
-        Assert.Equal(IngestOutcome.AlreadyExists, svc.IngestSegment(meta, file).Outcome);
-    }
-
-    [Fact]
-    public void CorruptedUploadIsRejected()
-    {
-        using var t = new TempData();
-        long now = TimeUtil.NowMs();
-        var (meta, file) = Upload(t, now - 60_000, now);
-        meta.Sha256 = new string('0', 64);
-        var r = new IngestService(t.Store, t.Paths).IngestSegment(meta, file);
-        Assert.Equal(IngestOutcome.Rejected, r.Outcome);
-        Assert.Null(t.Store.GetSegment(meta.SegmentId));
-    }
-
-    [Theory]
-    [InlineData("../../evil", "segmentId")]
-    [InlineData("not-a-guid", "segmentId")]
-    public void PathTricksInIdsAreRejected(string id, string expected)
-    {
-        var m = new IngestSegmentMetadata { SegmentId = id, SessionId = Guid.NewGuid().ToString(), DeviceId = Guid.NewGuid().ToString(), StartUtcMs = TimeUtil.NowMs() - 1000, EndUtcMs = TimeUtil.NowMs(), Width = 1, Height = 1, Sha256 = new string('a', 64) };
-        Assert.Contains(expected, IngestService.Validate(m, TimeUtil.NowMs()));
-    }
-}
-
 public class PairingTests
 {
     [Fact]
@@ -113,55 +47,53 @@ public class SyncServerTests
         return port;
     }
 
-    private static HttpClient PinnedClient(string fingerprint) => new(new HttpClientHandler
+    private static HttpClient Client(string fingerprint) => new(new HttpClientHandler
     {
-        // Same rule as the iPhone app: trust exactly the paired certificate, nothing else.
+        // In production Tailscale Serve presents a trusted certificate; in the test we pin the test certificate.
         ServerCertificateCustomValidationCallback = (_, cert, _, _) =>
             cert != null && Convert.ToHexString(SHA256.HashData(cert.RawData)).Equals(fingerprint, StringComparison.OrdinalIgnoreCase),
     });
 
+    private static string Ts(DateTimeOffset t) => t.ToString("yyyy-MM-ddTHH:mm:sszzz");
+
     [Fact]
-    public async Task UploadRequiresTokenAndStoresSegment()
+    public async Task AppEventsNeedTokenAndAreStoredOnce()
     {
         using var t = new TempData();
         using var cert = TestCertificate();
         var pairing = new PairingStore(t.Paths.SyncDir);
         var token = pairing.CreateToken("phone");
         int port = FreePort();
-        await using var server = await SyncServer.StartAsync(port, cert, pairing, new IngestService(t.Store, t.Paths), t.Paths, "test", IPAddress.Loopback);
-        using var http = PinnedClient(server.Fingerprint);
-        var baseUrl = $"https://127.0.0.1:{port}";
+        await using var server = await SyncServer.StartAsync(port, cert, pairing, t.Store, "test", IPAddress.Loopback);
+        using var http = Client(server.Fingerprint);
+        var url = $"https://127.0.0.1:{port}/api/v1/app-events";
+        var now = DateTimeOffset.Now;
+        var body = $$"""{"device_id":"iphone","source":"ios_shortcuts","app_name":"Instagram","event_type":"opened","timestamp":"{{Ts(now.AddMinutes(-5))}}","event_id":"e1"}""";
 
         // No token / wrong token
-        Assert.Equal(HttpStatusCode.Unauthorized, (await http.GetAsync(baseUrl + "/api/v1/hello")).StatusCode);
-        var wrong = new HttpRequestMessage(HttpMethod.Get, baseUrl + "/api/v1/hello");
+        Assert.Equal(HttpStatusCode.Unauthorized, (await http.PostAsync(url, new StringContent(body))).StatusCode);
+        var wrong = new HttpRequestMessage(HttpMethod.Post, url) { Content = new StringContent(body) };
         wrong.Headers.Authorization = new AuthenticationHeaderValue("Bearer", "nope");
         Assert.Equal(HttpStatusCode.Unauthorized, (await http.SendAsync(wrong)).StatusCode);
+        Assert.Empty(t.Store.GetAppEvents(0, long.MaxValue));
 
         http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        Assert.Equal(HttpStatusCode.OK, (await http.GetAsync(baseUrl + "/api/v1/hello")).StatusCode);
+        var first = await http.PostAsync(url, new StringContent(body, Encoding.UTF8, "application/json"));
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Contains("\"accepted\":1", await first.Content.ReadAsStringAsync());
 
-        long now = TimeUtil.NowMs();
-        var bytes = Mp4Builder.Build(30_000, 886, 1920);
-        var meta = new IngestSegmentMetadata
-        {
-            SegmentId = Guid.NewGuid().ToString(), SessionId = Guid.NewGuid().ToString(), DeviceId = Guid.NewGuid().ToString(),
-            DeviceName = "Test iPhone", StartUtcMs = now - 30_000, EndUtcMs = now, Width = 886, Height = 1920, Fps = 15,
-            Sha256 = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant(),
-        };
-        HttpRequestMessage Put()
-        {
-            var req = new HttpRequestMessage(HttpMethod.Put, $"{baseUrl}/api/v1/segments/{meta.SegmentId}") { Content = new ByteArrayContent(bytes) };
-            req.Headers.Add(SyncServer.MetadataHeader, Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(meta, RecorderConfig.JsonOptions))));
-            return req;
-        }
-        Assert.Equal(HttpStatusCode.Created, (await http.SendAsync(Put())).StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await http.SendAsync(Put())).StatusCode); // idempotent retry
-        Assert.Equal(SegmentStatus.Finalized, t.Store.GetSegment(meta.SegmentId)!.Status);
+        // The offline queue re-sends everything as JSON Lines: the known event is a duplicate, the new one is stored.
+        var queue = body + "\n" + $$"""{"device_id":"iphone","app_name":"Instagram","event_type":"closed","timestamp":"{{Ts(now.AddMinutes(-1))}}"}""";
+        var second = await http.PostAsync(url, new StringContent(queue, Encoding.UTF8, "text/plain"));
+        var json = JsonDocument.Parse(await second.Content.ReadAsStringAsync()).RootElement;
+        Assert.Equal(1, json.GetProperty("accepted").GetInt32());
+        Assert.Equal(1, json.GetProperty("duplicates").GetInt32());
+        Assert.Equal(2, t.Store.GetAppEvents(0, long.MaxValue).Count);
 
-        var gaps = new StringContent(JsonSerializer.Serialize(new[] { new IngestGap(now - 90_000, now - 60_000, "phone call") }, RecorderConfig.JsonOptions), Encoding.UTF8, "application/json");
-        Assert.Equal(HttpStatusCode.OK, (await http.PostAsync($"{baseUrl}/api/v1/devices/{meta.DeviceId}/gaps", gaps)).StatusCode);
-        Assert.Contains(t.Store.GetGapsInRange(0, long.MaxValue / 2), g => g.Reason == GapReasons.IosInterrupted);
+        // Nothing valid → 400 with reasons.
+        var bad = await http.PostAsync(url, new StringContent("""{"device_id":"iphone","app_name":"X","event_type":"maybe","timestamp":"now"}"""));
+        Assert.Equal(HttpStatusCode.BadRequest, bad.StatusCode);
+        Assert.Contains("event_type", await bad.Content.ReadAsStringAsync());
     }
 
     [Fact]
@@ -171,8 +103,8 @@ public class SyncServerTests
         using var cert = TestCertificate();
         var pairing = new PairingStore(t.Paths.SyncDir);
         int port = FreePort();
-        await using var server = await SyncServer.StartAsync(port, cert, pairing, new IngestService(t.Store, t.Paths), t.Paths, "test", IPAddress.Loopback);
-        using var http = PinnedClient(new string('0', 64));
+        await using var server = await SyncServer.StartAsync(port, cert, pairing, t.Store, "test", IPAddress.Loopback);
+        using var http = Client(new string('0', 64));
         await Assert.ThrowsAsync<HttpRequestException>(() => http.GetAsync($"https://127.0.0.1:{port}/api/v1/hello"));
     }
 }

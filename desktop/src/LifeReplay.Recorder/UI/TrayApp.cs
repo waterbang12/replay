@@ -67,9 +67,9 @@ internal sealed class TrayApp : ApplicationContext
         { ToolTipText = "Keeps the timeline running but records black frames until you turn it off" };
         _autoStartItem = new ToolStripMenuItem("Start with Windows", null, (_, _) => ToggleAutoStart()) { Checked = AutoStart.IsEnabled() };
         _syncStatusItem = new ToolStripMenuItem("") { Enabled = false };
-        _syncEnabledItem = new ToolStripMenuItem("Enable iPhone sync (local network)", null, async (_, _) => await ToggleSync());
-        _syncPairItem = new ToolStripMenuItem("Pair an iPhone...", null, (_, _) => ShowPairing());
-        var syncMenu = new ToolStripMenuItem("iPhone sync");
+        _syncEnabledItem = new ToolStripMenuItem("Enable iPhone app tracking", null, async (_, _) => await ToggleSync());
+        _syncPairItem = new ToolStripMenuItem("Set up iPhone (new token)...", null, (_, _) => ShowPairing());
+        var syncMenu = new ToolStripMenuItem("iPhone app tracking");
         syncMenu.DropDownItems.AddRange([_syncStatusItem, _syncEnabledItem, _syncPairItem,
             new ToolStripMenuItem("Revoke all paired iPhones", null, (_, _) => RevokePairings())]);
 
@@ -205,8 +205,9 @@ internal sealed class TrayApp : ApplicationContext
     {
         bool enable = !_host.Config.Sync.Enabled;
         if (enable && MessageBox.Show(
-                "This opens an encrypted (HTTPS) endpoint on your local network so a paired iPhone can upload its recordings.\n\n" +
-                "Only devices that scanned a pairing code can connect. Windows may ask whether to allow LifeReplay through the firewall; allow it on private networks only.\n\nEnable iPhone sync?",
+                "This starts an encrypted (HTTPS) endpoint so your iPhone's Shortcuts can report which apps you open and close (no screen recording).\n\n" +
+                "It listens only on this PC (127.0.0.1); your phone reaches it through Tailscale Serve, which only your own devices can use. " +
+                "Every request needs the token from \"Set up iPhone…\".\n\nEnable iPhone app tracking?",
                 "LifeReplay", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
         await _host.SetSyncEnabledAsync(enable);
         RefreshUi();
@@ -217,8 +218,8 @@ internal sealed class TrayApp : ApplicationContext
     {
         try
         {
-            var (uri, host, port, fp) = _host.CreatePairing();
-            using var dlg = new PairingDialog(uri, host, port, fp);
+            var (token, url, port) = _host.CreatePairing();
+            using var dlg = new PairingDialog(token, url, port);
             dlg.ShowDialog();
         }
         catch (Exception ex) { Log.Error("Pairing failed", ex); MessageBox.Show(ex.Message, "LifeReplay"); }

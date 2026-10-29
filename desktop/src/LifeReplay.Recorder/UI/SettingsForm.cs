@@ -188,7 +188,7 @@ internal sealed class SettingsForm : Form
                 End = _hoursEnd.Value.ToString("HH:mm"),
                 WeekdaysOnly = _weekdaysOnly.Checked,
             },
-            Sync = old.Sync, // managed from the tray's iPhone sync menu
+            Sync = old.Sync, // managed from the tray's "iPhone app tracking" menu
         };
         cfg.Normalize();
         return cfg;

@@ -113,7 +113,7 @@ public sealed class TimelineControl : FrameworkElement
             bool newDay = _data == null || value == null || _data.DayStartMs != value.DayStartMs;
             _data = value;
             if (value != null && newDay) { _viewStart = value.DayStartMs; _viewEnd = value.DayEndMs; }
-            int lanes = Math.Max(1, value?.Lanes.Count ?? 1) + (value?.Focus.Count > 0 ? 1 : 0);
+            int lanes = Math.Max(1, value?.Lanes.Count ?? 1) + (value?.Focus.Count > 0 ? 1 : 0) + (value != null && HasPhoneLane(value) ? 1 : 0);
             Height = AxisHeight + lanes * (LaneHeight + LaneGap) + 8;
             InvalidateVisual();
         }
@@ -154,6 +154,22 @@ public sealed class TimelineControl : FrameworkElement
     private double X(long t) => TrackLeft + (t - _viewStart) / (double)(_viewEnd - _viewStart) * TrackWidth;
     private long T(double x) => _viewStart + (long)((x - TrackLeft) / TrackWidth * (_viewEnd - _viewStart));
     private double LaneTop(int i) => AxisHeight + i * (LaneHeight + LaneGap);
+
+    // The iPhone lane is shown once any iPhone event was ever received, so an empty day visibly means "nothing synced".
+    private static bool HasPhoneLane(DayTimeline d) => d.PhoneSessions.Count > 0 || d.PhoneStatus.Count > 0;
+    private int PhoneLaneIndex => _data!.Lanes.Count + (_data.Focus.Count > 0 ? 1 : 0);
+    private static readonly Brush InferredHatch = MakeHatch(Color.FromArgb(0x70, 0x1F, 0x1F, 0x22));
+    private static readonly Brush WarnBrush = Freeze(new SolidColorBrush(Color.FromRgb(0xF5, 0xB7, 0x3B)));
+
+    /// <summary>"synced 14:02" / "last sync 2 d ago" for the lane label; warn when nothing arrived for 12 h.</summary>
+    internal static (string Text, bool Stale) PhoneSyncText(DayTimeline d)
+    {
+        if (d.PhoneStatus.LastReceivedUtcMs is not { } last) return ("no events yet", true);
+        long age = d.NowMs - last;
+        var local = TimeUtil.ToLocal(last);
+        string when = age < 86_400_000 && local.Date == TimeUtil.ToLocal(d.NowMs).Date ? local.ToString("HH:mm") : local.ToString("MMM d HH:mm");
+        return ($"synced {when}", age > 12 * 3_600_000L);
+    }
 
     protected override void OnRender(DrawingContext dc)
     {
@@ -261,6 +277,47 @@ public sealed class TimelineControl : FrameworkElement
                 if (r.Width > 60)
                 {
                     var label = new FormattedText(FocusSummary.ItemName(f.Process, f.Title), CultureInfo.CurrentCulture, FlowDirection.LeftToRight, Font, 10.5, Brushes.White, dpi)
+                    { MaxTextWidth = r.Width - 6, MaxLineCount = 1, Trimming = TextTrimming.CharacterEllipsis };
+                    dc.DrawText(label, new Point(r.X + 3, top + (LaneHeight - label.Height) / 2));
+                }
+            }
+            dc.Pop();
+        }
+
+        // iPhone apps lane (Shortcuts events): solid = opened+closed seen, faded+hatched = one end inferred,
+        // small dashed marker = only one event known (duration unknown, not counted).
+        if (HasPhoneLane(_data))
+        {
+            double top = LaneTop(PhoneLaneIndex);
+            var name = new FormattedText("📱 iPhone apps", CultureInfo.CurrentCulture, FlowDirection.LeftToRight, Font, 12, TextBrush, dpi);
+            dc.DrawText(name, new Point(10, top + 1));
+            var (syncText, stale) = PhoneSyncText(_data);
+            var status = new FormattedText((stale ? "⚠ " : "") + syncText, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, Font, 9.5, stale ? WarnBrush : MutedBrush, dpi)
+            { MaxTextWidth = LabelWidth - 14, MaxLineCount = 1, Trimming = TextTrimming.CharacterEllipsis };
+            dc.DrawText(status, new Point(12, top + 17));
+            dc.PushClip(clip);
+            dc.DrawRectangle(LaneBrush, null, new Rect(TrackLeft, top, TrackWidth, LaneHeight));
+            foreach (var s in _data.PhoneSessions)
+            {
+                if (s.EndUtcMs < _viewStart || s.StartUtcMs > _viewEnd) continue;
+                var brush = AppBrush("ios:" + s.App);
+                if (!s.HasDuration)
+                {
+                    double x = X(s.StartUtcMs);
+                    var pen = new Pen(brush, 2) { DashStyle = DashStyles.Dash };
+                    dc.DrawLine(pen, new Point(x, top + 3), new Point(x, top + LaneHeight - 3));
+                    dc.DrawEllipse(BadBrush, null, new Point(x, top + 4), 2.5, 2.5); // missing-event marker
+                    continue;
+                }
+                double x0 = X(s.StartUtcMs), x1 = X(s.EndUtcMs);
+                var r = new Rect(x0, top + 3, Math.Max(1.5, x1 - x0), LaneHeight - 6);
+                bool inferred = s.Confidence != SessionConfidence.Complete;
+                if (inferred) dc.PushOpacity(0.6);
+                dc.DrawRectangle(brush, null, r);
+                if (inferred) { dc.DrawRectangle(InferredHatch, null, r); dc.Pop(); }
+                if (r.Width > 50)
+                {
+                    var label = new FormattedText(s.App, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, Font, 10.5, Brushes.White, dpi)
                     { MaxTextWidth = r.Width - 6, MaxLineCount = 1, Trimming = TextTrimming.CharacterEllipsis };
                     dc.DrawText(label, new Point(r.X + 3, top + (LaneHeight - label.Height) / 2));
                 }
@@ -388,6 +445,22 @@ public sealed class TimelineControl : FrameworkElement
         long t = T(p.X);
         int laneIndex = (int)((p.Y - AxisHeight) / (LaneHeight + LaneGap));
         var lanes = _data.Lanes;
+        if (HasPhoneLane(_data) && laneIndex == PhoneLaneIndex)
+        {
+            long tolerance = (long)(6 / TrackWidth * (_viewEnd - _viewStart)); // 6 px
+            var s = _data.PhoneSessionAt(t, tolerance);
+            _popupImage.Source = null;
+            _popupImage.Visibility = Visibility.Collapsed;
+            _popupText.Text = s == null
+                ? $"{TimeUtil.ToLocal(t):HH:mm:ss}  ·  no iPhone app event\n{PhoneSyncText(_data).Text}"
+                : DescribePhoneSession(s);
+            _popupText.MaxWidth = 420;
+            _popupText.TextWrapping = TextWrapping.Wrap;
+            _popup.HorizontalOffset = Math.Clamp(p.X - 210, 0, Math.Max(0, ActualWidth - 430));
+            _popup.VerticalOffset = -100;
+            _popup.IsOpen = true;
+            return;
+        }
         if (laneIndex == lanes.Count && _data.Focus.Count > 0)
         {
             var f = _data.FocusAt(t);
@@ -427,6 +500,23 @@ public sealed class TimelineControl : FrameworkElement
         _popup.HorizontalOffset = Math.Clamp(p.X - popupWidth / 2, 0, Math.Max(0, ActualWidth - popupWidth));
         _popup.VerticalOffset = -(img != null ? 215 : 34);
         _popup.IsOpen = true;
+    }
+
+    internal static string ConfidenceText(SessionConfidence c) => c switch
+    {
+        SessionConfidence.Complete => "complete (opened + closed)",
+        SessionConfidence.EndInferred => "end inferred (no closed event)",
+        SessionConfidence.StartInferred => "start inferred (no opened event)",
+        _ => "incomplete (duration unknown)",
+    };
+
+    internal static string DescribePhoneSession(AppSession s)
+    {
+        string range = s.HasDuration
+            ? $"{TimeUtil.ToLocal(s.StartUtcMs):HH:mm:ss}–{TimeUtil.ToLocal(s.EndUtcMs):HH:mm:ss} ({TimeUtil.FormatDuration(s.DurationMs)})"
+            : $"{TimeUtil.ToLocal(s.StartUtcMs):HH:mm:ss} (one event only)";
+        return $"📱 {s.App}\n{range}\nSource: {s.Source} · {s.DeviceId}\nConfidence: {ConfidenceText(s.Confidence)}" +
+               (string.IsNullOrEmpty(s.Note) ? "" : $"\n{s.Note}");
     }
 
     private BitmapImage? LoadImage(string path)

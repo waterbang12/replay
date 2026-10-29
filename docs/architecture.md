@@ -5,13 +5,14 @@
 ```
 desktop/
   src/LifeReplay.Core      .NET 10 library: SQLite store + migrations, MP4 integrity check, crash recovery,
-                           retention, day timeline/gap model, iPhone ingest, config, logging. No Windows APIs.
-  src/LifeReplay.Sync      Opt-in HTTPS endpoint for iPhone uploads (Kestrel, pinned self-signed cert, bearer token).
+                           retention, day timeline/gap model, iPhone app events + session rebuilding
+                           (AppEvents, AppSessions), config, logging. No Windows APIs.
+  src/LifeReplay.Sync      Opt-in HTTPS endpoint (127.0.0.1, bearer token) for iPhone Shortcuts app events,
+                           published to the tailnet with Tailscale Serve. See docs/iphone-shortcuts.md.
   src/LifeReplay.Recorder  LifeReplay.exe: tray app + capture/encode pipeline (WinForms, WinRT, Direct3D 11).
   src/LifeReplay.Viewer    LifeReplay.Viewer.exe: WPF replay app (calendar, timeline, multi-screen playback).
-  tests/LifeReplay.Tests   xUnit tests for Core and Sync (47 tests).
-ios/                       Swift app + ReplayKit Broadcast Upload Extension (XcodeGen project).
-shared/                    Sync protocol and metadata schema used by both platforms.
+  tests/LifeReplay.Tests   xUnit tests for Core, Sync and Analysis.
+shared/                    iPhone event protocol (sync-protocol.md).
 ```
 
 The recorder and the viewer are separate processes. A viewer crash can't stop recording, and the viewer

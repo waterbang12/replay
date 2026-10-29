@@ -111,6 +111,9 @@ internal sealed class RecorderHost : IAsyncDisposable
     public async Task SetSyncEnabledAsync(bool enabled)
     {
         Config.Sync.Enabled = enabled;
+        // Shortcuts only accepts trusted certificates, so the phone reaches LifeReplay through Tailscale Serve,
+        // which forwards to this PC's loopback address. Nothing needs to listen on the LAN.
+        if (enabled && Config.Sync.BindAddress == "0.0.0.0") Config.Sync.BindAddress = "127.0.0.1";
         SaveConfig();
         await StopSyncAsync();
         if (enabled) await StartSyncAsync();
@@ -122,7 +125,7 @@ internal sealed class RecorderHost : IAsyncDisposable
         {
             var cert = CertificateManager.GetOrCreate(Paths.SyncDir, DeviceId);
             var bind = System.Net.IPAddress.TryParse(Config.Sync.BindAddress, out var ip) ? ip : System.Net.IPAddress.Any;
-            _sync = await SyncServer.StartAsync(Config.Sync.Port, cert, Pairing, new IngestService(Store, Paths), Paths, Environment.MachineName, bind);
+            _sync = await SyncServer.StartAsync(Config.Sync.Port, cert, Pairing, Store, Environment.MachineName, bind);
             SyncError = null;
         }
         catch (Exception ex)
@@ -139,16 +142,31 @@ internal sealed class RecorderHost : IAsyncDisposable
         Controller.SyncEnabled = false;
     }
 
-    /// <summary>Creates a token for a new phone and returns the pairing URI for the QR code.</summary>
-    public (string Uri, string Host, int Port, string Fingerprint) CreatePairing()
+    /// <summary>Creates a token for the iPhone's Shortcuts and works out the address the phone should use.</summary>
+    public (string Token, string? EndpointUrl, int Port) CreatePairing()
     {
-        var cert = CertificateManager.GetOrCreate(Paths.SyncDir, DeviceId);
-        var fp = CertificateManager.Fingerprint(cert);
-        var token = Pairing.CreateToken($"iPhone paired {DateTime.Now:yyyy-MM-dd HH:mm}");
-        var host = PairingDialog.LocalAddress();
-        int port = Config.Sync.Port;
-        var uri = $"lifereplay://pair?h={Uri.EscapeDataString(host)}&p={port}&t={Uri.EscapeDataString(token)}&f={fp}&n={Uri.EscapeDataString(Environment.MachineName)}";
-        return (uri, host, port, fp);
+        var token = Pairing.CreateToken($"iPhone Shortcuts {DateTime.Now:yyyy-MM-dd HH:mm}");
+        var name = TailscaleName();
+        return (token, name != null ? $"https://{name}/api/v1/app-events" : null, Config.Sync.Port);
+    }
+
+    /// <summary>This PC's Tailscale MagicDNS name (e.g. "my-pc.tail1234.ts.net"), if Tailscale is installed and signed in.</summary>
+    public static string? TailscaleName()
+    {
+        try
+        {
+            var exe = new[] { "tailscale.exe", Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Tailscale", "tailscale.exe") }
+                .FirstOrDefault(p => !Path.IsPathRooted(p) || File.Exists(p)) ?? "tailscale.exe";
+            using var p = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(exe, "status --json")
+            { RedirectStandardOutput = true, UseShellExecute = false, CreateNoWindow = true });
+            if (p == null) return null;
+            var json = p.StandardOutput.ReadToEndAsync();
+            if (!p.WaitForExit(3000) || !json.Wait(1000)) { try { p.Kill(); } catch { } return null; }
+            using var doc = System.Text.Json.JsonDocument.Parse(json.Result);
+            var dns = doc.RootElement.GetProperty("Self").GetProperty("DNSName").GetString()?.TrimEnd('.');
+            return string.IsNullOrEmpty(dns) ? null : dns;
+        }
+        catch { return null; }
     }
 
     // ------------------------------------------------------------------ Windows events
