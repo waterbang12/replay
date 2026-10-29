@@ -11,6 +11,7 @@ internal sealed class PairingDialog : Form
     public PairingDialog(string token, string? endpointUrl, int port)
     {
         Text = "iPhone app tracking (Shortcuts)";
+        if (AppIcon.Get() is { } appIcon) Icon = appIcon;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;

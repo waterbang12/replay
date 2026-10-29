@@ -9,8 +9,13 @@
     <RootNamespace>LifeReplay.CoachTray</RootNamespace>
     <OutputPath>$(MSBuildThisFileDirectory)..\..\bin\$(Configuration)\</OutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <!-- App icon (desktop/assets/lifereplay.ico). Optional: builds without it. -->
+    <ApplicationIcon Condition="Exists('$(MSBuildThisFileDirectory)..\..\assets\lifereplay.ico')">$(MSBuildThisFileDirectory)..\..\assets\lifereplay.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\LifeReplay.Coach\LifeReplay.Coach.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="Exists('$(MSBuildThisFileDirectory)..\..\assets\lifereplay.ico')">
+    <None Include="$(MSBuildThisFileDirectory)..\..\assets\lifereplay.ico" Link="lifereplay.ico" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

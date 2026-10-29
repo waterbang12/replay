@@ -51,6 +51,7 @@ internal sealed class SettingsForm : Form
         _host = host;
         _dataDirArg = dataDirArg;
         Text = "LifeReplay settings";
+        if (AppIcon.Get() is { } appIcon) Icon = appIcon;
         StartPosition = FormStartPosition.CenterScreen;
         AutoScaleMode = AutoScaleMode.Dpi;
         Font = new Font("Segoe UI", 9.5f);

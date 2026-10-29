@@ -12,11 +12,16 @@
     <!-- Recorder and Viewer share one output folder so the tray can launch the viewer. -->
     <OutputPath>$(MSBuildThisFileDirectory)..\..\bin\$(Configuration)\</OutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <!-- App icon (desktop/assets/lifereplay.ico). Optional: builds without it. -->
+    <ApplicationIcon Condition="Exists('$(MSBuildThisFileDirectory)..\..\assets\lifereplay.ico')">$(MSBuildThisFileDirectory)..\..\assets\lifereplay.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Vortice.Direct3D11" Version="3.8.3" />
     <PackageReference Include="QRCoder" Version="1.8.0" />
     <ProjectReference Include="..\LifeReplay.Core\LifeReplay.Core.csproj" />
     <ProjectReference Include="..\LifeReplay.Sync\LifeReplay.Sync.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="Exists('$(MSBuildThisFileDirectory)..\..\assets\lifereplay.ico')">
+    <None Include="$(MSBuildThisFileDirectory)..\..\assets\lifereplay.ico" Link="lifereplay.ico" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

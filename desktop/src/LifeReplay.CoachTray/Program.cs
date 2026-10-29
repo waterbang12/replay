@@ -103,13 +103,25 @@ internal sealed class CoachTrayContext : ApplicationContext
         menu.Items.Add("Quiet for today", null, (_, _) => Safe(() => Service().QuietToday(DateOnly.FromDateTime(DateTime.Now))));
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Exit coach", null, (_, _) => { _icon!.Visible = false; ExitThread(); });
-        _icon = new NotifyIcon { Icon = SystemIcons.Information, Text = "LifeReplay coach", Visible = true, ContextMenuStrip = menu };
+        _icon = new NotifyIcon { Icon = TrayIcon(), Text = "LifeReplay coach", Visible = true, ContextMenuStrip = menu };
         _icon.BalloonTipClicked += (_, _) => OpenViewer();
         _icon.DoubleClick += (_, _) => OpenViewer();
         _timer = new System.Windows.Forms.Timer { Interval = 5 * 60_000 };
         _timer.Tick += (_, _) => Tick(manual: false);
         _timer.Start();
         Tick(manual: false);
+    }
+
+    /// <summary>The rabbit icon at tray size (lifereplay.ico next to the exe), else the system "info" icon.</summary>
+    private static Icon TrayIcon()
+    {
+        try
+        {
+            var path = Path.Combine(AppContext.BaseDirectory, "lifereplay.ico");
+            if (File.Exists(path)) return new Icon(path, SystemInformation.SmallIconSize);
+        }
+        catch (Exception ex) { Log.Warn("Coach tray icon could not be loaded", ex); }
+        return SystemIcons.Information;
     }
 
     private CoachService Service() => new(new CoachStore(_store), CoachConfig.Load(_paths), null);
