@@ -140,7 +140,24 @@ public partial class MainWindow
         if (version != _summaryVersion) return; // a newer render started
         long total = topics.Sum(t => t.DurationMs);
         SummarySubtitle.Text = topics.Count == 0 ? "No window titles logged for this day."
-            : $"{topics.Count} topics, {TimeUtil.FormatDuration(total)} of active use, grouped automatically by meaning. Click to jump.";
+            : $"{TimeUtil.FormatDuration(total)} of active use. YouTube and Social are fixed groups; everything else is grouped automatically by meaning. Click to jump.";
+        if (topics.Count > 0)
+        {
+            // Category totals: YouTube / Social / Other
+            var totals = new WrapPanel { Margin = new Thickness(0, 4, 0, 6) };
+            foreach (var cat in new[] { FixedCategories.YouTube, FixedCategories.Social, FixedCategories.Other })
+            {
+                long ms = topics.Where(t => t.Category == cat).Sum(t => t.DurationMs);
+                var box = new Border
+                {
+                    Background = new SolidColorBrush(Color.FromRgb(0x30, 0x30, 0x36)), CornerRadius = new CornerRadius(4),
+                    Padding = new Thickness(10, 6, 10, 6), Margin = new Thickness(0, 0, 6, 6),
+                    Child = new StackPanel { Children = { Text(cat, 11.5, color: Muted, margin: new Thickness(0)), Text(TimeUtil.FormatDuration(ms), 15, bold: true, margin: new Thickness(0)) } },
+                };
+                totals.Children.Add(box);
+            }
+            SummaryList.Children.Add(totals);
+        }
         foreach (var t in topics)
         {
             var header = (DockPanel)Row(t.Label, TimeUtil.FormatDuration(t.DurationMs), 13.5, margin: new Thickness(0, 10, 0, 0), onClick: () => SeekToItem(t.Items[0]));

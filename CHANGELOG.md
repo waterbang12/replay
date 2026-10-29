@@ -2,6 +2,15 @@
 
 Each entry says what changed and why it was needed.
 
+## 0.3.1 — 2026-10-29
+
+### Added
+- **Fixed groups in Topics: YouTube, Social, Other.** YouTube and social/messaging windows are always counted in
+  their own groups (decided from the app and window title); everything else is "Other", sorted by topic as before.
+  Totals for the three are shown at the top.
+  *Why:* feedback on time that isn't part of the day's work, while keeping the rest topic-oriented: study and work
+  are interchangeable here, so they aren't split into fixed buckets.
+
 ## 0.3.0 — 2026-10-29
 
 ### Added

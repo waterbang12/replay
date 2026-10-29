@@ -96,7 +96,8 @@ locked, sleep, display off, private app, recorder not running, crash…).
 The viewer's **Summary** button opens a panel with three views of the selected day, built from the window-title log:
 
 - **Apps**: time per app, with the tabs / documents / files under each.
-- **Topics**: windows grouped automatically by *meaning*, so "Domain Theory.pdf", "위상수학 과제.pdf" and "Scott
+- **Topics**: totals for **YouTube**, **Social** and **Other** at the top, then YouTube and Social as fixed
+  groups and everything else grouped automatically by *meaning*, so "Domain Theory.pdf", "위상수학 과제.pdf" and "Scott
   domains.pdf" become one topic even though they share no words. No setup needed.
 - **Plan**: your todo list with time per task and **ahead / behind schedule** for today.
 

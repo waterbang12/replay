@@ -136,6 +136,33 @@ public class DayAnalysisTests
         Assert.Equal(-1 * 3_600_000L, s.AheadMs); // 1h spent on plan vs 2h expected → 1h behind
     }
 
+    [Theory]
+    [InlineData("Google Chrome", "lofi beats - YouTube", "YouTube")]
+    [InlineData("KakaoTalk", "KakaoTalk", "Social")]
+    [InlineData("Google Chrome", "Home / X", "Social")]
+    [InlineData("Google Chrome", "r/math - Reddit", "Social")]
+    [InlineData("Google Chrome", "pwn.college - Program Misuse", "Other")]
+    [InlineData("VS Code", "exploit.py - pwn-notes", "Other")]
+    public void FixedCategoriesFromAppAndTitle(string app, string item, string expected) =>
+        Assert.Equal(expected, FixedCategories.Of(new TitleItem(app, item, 1, 0)));
+
+    [Fact]
+    public void CategorizeKeepsFixedGroupsAndClustersTheRest()
+    {
+        var items = new List<TitleItem>
+        {
+            new("Chrome", "video - YouTube", 40, 0), new("KakaoTalk", "KakaoTalk", 10, 0),
+            new("Chrome", "pwn A", 30, 0), new("Chrome", "pwn B", 20, 0), new("Edge", "math", 25, 0),
+        };
+        var vec = new Dictionary<string, float[]> { ["pwn A"] = V(1, 0, 0), ["pwn B"] = V(0.95f, 0.05f, 0), ["math"] = V(0, 1, 0) };
+        int clusteredCount = 0;
+        var topics = DayAnalysis.Categorize(items, list => { clusteredCount = list.Count; return list.Select(i => vec[i.Item]).ToList(); });
+        Assert.Equal(3, clusteredCount); // YouTube and Social windows never go through the model
+        Assert.Equal(("YouTube", 40L), (topics[0].Label, topics[0].DurationMs));
+        Assert.Equal(("Social", "Social"), (topics[1].Label, topics[1].Category));
+        Assert.Contains(topics, t => t.Category == "Other" && t.DurationMs == 50);
+    }
+
     [Fact]
     public void TopicsGroupSimilarWindows()
     {

@@ -52,8 +52,11 @@ public sealed class AnalysisService : IDisposable
     {
         var items = DayAnalysis.Items(focus, fromMs, toMs);
         if (items.Count == 0) return [];
-        var v = Vectors(items.Take(300).Select(i => i.Text));
-        return DayAnalysis.FindTopics(items, items.Take(300).Select(i => v[i.Text]).ToList());
+        return DayAnalysis.Categorize(items, list =>
+        {
+            var v = Vectors(list.Select(i => i.Text));
+            return list.Select(i => v[i.Text]).ToList();
+        });
     }
 
     public PlanStatus Plan(TodoPlan plan, IReadOnlyList<FocusRecord> focus, long fromMs, long toMs, long nowMs, TimeSpan defaultStart, TimeSpan defaultEnd)

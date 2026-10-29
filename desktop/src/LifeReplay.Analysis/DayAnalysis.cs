@@ -13,7 +13,8 @@ public sealed record TitleItem(string App, string Item, long DurationMs, long Fi
         : Item.Length < 12 && !Item.Contains(' ') ? $"{Item} ({App})" : Item;
 }
 
-public sealed record Topic(string Label, long DurationMs, List<TitleItem> Items);
+/// <summary>A group of windows. <see cref="Category"/> is YouTube, Social, or Other (the topic-sorted rest).</summary>
+public sealed record Topic(string Label, long DurationMs, List<TitleItem> Items, string Category = FixedCategories.Other);
 
 public enum MatchHow { Keyword, Learned, Meaning, Context, Manual }
 
@@ -91,9 +92,30 @@ public static class DayAnalysis
         if (items.Count > n)
         {
             var rest = items.Skip(n).ToList();
-            topics.Add(new Topic("Other", rest.Sum(r => r.DurationMs), rest));
+            topics.Add(new Topic("Other windows", rest.Sum(r => r.DurationMs), rest));
         }
         return topics.OrderByDescending(t => t.DurationMs).ToList();
+    }
+
+    /// <summary>
+    /// YouTube and Social first (one group each), then everything else grouped by topic.
+    /// <paramref name="vectorsFor"/> is only called for the "Other" windows.
+    /// </summary>
+    public static List<Topic> Categorize(IReadOnlyList<TitleItem> items, Func<IReadOnlyList<TitleItem>, IReadOnlyList<float[]>> vectorsFor)
+    {
+        var result = new List<Topic>();
+        foreach (var fixedCat in new[] { FixedCategories.YouTube, FixedCategories.Social })
+        {
+            var members = items.Where(i => FixedCategories.Of(i) == fixedCat).OrderByDescending(i => i.DurationMs).ToList();
+            if (members.Count > 0) result.Add(new Topic(fixedCat, members.Sum(m => m.DurationMs), members, fixedCat));
+        }
+        var rest = items.Where(i => FixedCategories.Of(i) == FixedCategories.Other).ToList();
+        if (rest.Count > 0)
+        {
+            var clustered = rest.Take(300).ToList();
+            result.AddRange(FindTopics(rest, vectorsFor(clustered)));
+        }
+        return result;
     }
 
     // ------------------------------------------------------------------ plan matching
