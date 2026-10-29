@@ -2,6 +2,29 @@
 
 Each entry says what changed and why it was needed.
 
+## 0.3.0 — 2026-10-29
+
+### Added
+- **Topics view**: the day's windows grouped automatically by meaning with a small multilingual language
+  model (paraphrase-multilingual-MiniLM-L12-v2, int8 ONNX, CPU only), via average-linkage clustering.
+  *Why:* work varies day to day (coursework PDFs, coding, random papers on topology or domain theory), so
+  you can't define keyword rules in advance. Grouping by meaning shows what you actually did with no setup,
+  and works across Korean and English titles.
+- **Plan view with a Markdown todo list** (`- [ ] task ~1h`, optional `match:` / `progress:` / `hours:`):
+  time per task, time left (from your pace when progress is given), and ahead/behind schedule for today.
+  *Why:* to know during the day whether the plan is on track, not only in hindsight.
+- **Matching in layers**: your manual choices → keywords → learned from your choices → meaning → context
+  (a window between two windows of the same task). Unmatched windows get an "Assign to…" box.
+  *Why:* rules alone miss varied work, and meaning alone mislabels context-free windows such as a bare
+  terminal; each layer covers the others' blind spots. Thresholds were calibrated on real titles (correct
+  tasks scored 0.41–0.90; unrelated titles stayed below about 0.37).
+- **Embedding cache and manual labels** (database schema v3), so each title goes through the model only once.
+- **Pinned model download** (exact revision + SHA-256) into `<data dir>\models`.
+
+### Fixed
+- Adding the app name ("… (Google Chrome)") to every title made all tabs of one browser look alike and
+  pulled unrelated tabs into one topic; it's now added only to short generic titles ("Inbox", "YouTube").
+
 ## 0.2.0 — 2026-10-29
 
 ### Added

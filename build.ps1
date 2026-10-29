@@ -38,6 +38,7 @@ Write-Host "Using $dotnet"
 $sln = Join-Path $root "desktop\LifeReplay.slnx"
 if (-not $SkipTests) {
     Write-Host "`n== Tests" -ForegroundColor Cyan
+    # Model-dependent tests run only if the topic model is installed (they skip themselves otherwise).
     & $dotnet test (Join-Path $root "desktop\tests\LifeReplay.Tests") -c $Configuration
     if ($LASTEXITCODE -ne 0) { throw "Tests failed" }
 }

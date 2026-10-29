@@ -96,6 +96,19 @@ public static class Migrations
             );
             CREATE INDEX ix_focus_start ON focus_events(start_utc);
             """),
+        (3, """
+            CREATE TABLE text_embeddings (
+                model  TEXT NOT NULL,
+                text   TEXT NOT NULL,
+                vector BLOB NOT NULL,
+                PRIMARY KEY (model, text)
+            );
+            CREATE TABLE title_labels (
+                item        TEXT PRIMARY KEY,
+                task        TEXT NOT NULL,
+                created_utc INTEGER NOT NULL
+            );
+            """),
     ];
 
     public static int LatestVersion => All[^1].Version;

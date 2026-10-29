@@ -93,6 +93,7 @@ public partial class MainWindow : Window
         DeleteDayItem.Click += (_, _) => DeleteDay();
         SummaryButton.Checked += (_, _) => { SummaryPanel.Visibility = Visibility.Visible; UpdateSummary(); };
         SummaryButton.Unchecked += (_, _) => SummaryPanel.Visibility = Visibility.Collapsed;
+        InitSummaryModes();
         PreviewKeyDown += OnKey;
         Closed += (_, _) => { foreach (var v in _views) v.Unload(); };
 
@@ -358,9 +359,9 @@ public partial class MainWindow : Window
 
     // ------------------------------------------------------------------ time per app / tab
 
-    private void UpdateSummary()
+    private void RenderApps()
     {
-        if (_timeline == null || SummaryPanel.Visibility != Visibility.Visible) return;
+        if (_timeline == null) return;
         var apps = FocusSummary.Summarize(_timeline.Focus, _timeline.DayStartMs, _timeline.DayEndMs);
         long total = apps.Sum(a => a.DurationMs);
         SummaryTitle.Text = $"Time per app · {_day:ddd, MMM d}";

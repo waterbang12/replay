@@ -11,5 +11,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\LifeReplay.Core\LifeReplay.Core.csproj" />
+    <ProjectReference Include="..\LifeReplay.Analysis\LifeReplay.Analysis.csproj" />
   </ItemGroup>
 </Project>

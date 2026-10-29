@@ -13,5 +13,6 @@
     <Using Include="Xunit" />
     <ProjectReference Include="..\..\src\LifeReplay.Core\LifeReplay.Core.csproj" />
     <ProjectReference Include="..\..\src\LifeReplay.Sync\LifeReplay.Sync.csproj" />
+    <ProjectReference Include="..\..\src\LifeReplay.Analysis\LifeReplay.Analysis.csproj" />
   </ItemGroup>
 </Project>

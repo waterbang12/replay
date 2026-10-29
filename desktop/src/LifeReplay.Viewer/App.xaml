@@ -65,6 +65,7 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <Style TargetType="RadioButton" BasedOn="{StaticResource {x:Type ToggleButton}}"/>
         <!-- No Foreground here: an app-wide TextBlock style would also recolor text inside ComboBoxes. -->
         <Style TargetType="TextBlock">
             <Setter Property="VerticalAlignment" Value="Center"/>

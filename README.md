@@ -91,6 +91,43 @@ On the timeline, blue = Windows recording, green = iPhone, purple = still being 
 darker stripes = nothing changed on screen, red hatching = gap (labelled with the reason when known: paused,
 locked, sleep, display off, private app, recorder not running, crash…).
 
+## What did I work on? (Summary → Apps / Topics / Plan)
+
+The viewer's **Summary** button opens a panel with three views of the selected day, built from the window-title log:
+
+- **Apps**: time per app, with the tabs / documents / files under each.
+- **Topics**: windows grouped automatically by *meaning*, so "Domain Theory.pdf", "위상수학 과제.pdf" and "Scott
+  domains.pdf" become one topic even though they share no words. No setup needed.
+- **Plan**: your todo list with time per task and **ahead / behind schedule** for today.
+
+Topics and Plan use a small multilingual language model (paraphrase-multilingual-MiniLM-L12-v2, Korean +
+English, 113 MB, downloaded once from Hugging Face and verified by checksum). It runs on the CPU only while the
+panel is open (~250 MB of memory; 300 titles take about 1 s), and nothing leaves the PC.
+
+**Todo list** (`Documents\LifeReplay\todo.md` by default; "Open todo list" creates it):
+
+```md
+# Every day
+hours: 09:00-18:00              ← working window for ahead/behind (else recording hours, else 09–18)
+
+# 2026-10-30
+- [ ] pwn.college: Program Misuse ~2h
+  match: pwn.college            ← optional exact keywords
+  progress: 3/10 levels         ← optional; gives "about 1h 10m left at your pace"
+- [ ] Read domain theory paper ~1h
+- [x] Fix LifeReplay viewer ~45m
+```
+
+How windows are matched to tasks, most trusted first:
+1. **your choice**: unmatched windows have an "Assign to…" box; LifeReplay remembers it;
+2. **keywords** from `match:`;
+3. **learned**: very similar to a window you assigned before;
+4. **meaning**: the task the model finds most similar (score ≥ 0.40 and clearly ahead of the runner-up);
+5. **context**: a window between two windows of the same task (≤ 5 min apart), e.g. a terminal between
+   two pwn.college tabs.
+
+Ahead/behind = time spent on planned tasks − (planned total × share of the working day passed).
+
 ## Settings (`%LOCALAPPDATA%\LifeReplay\config.json`)
 
 Changes are applied automatically when the file is saved (or via tray → Reload settings).

@@ -61,11 +61,16 @@
         </Border>
 
         <!-- Time per app / tab (window-title log) -->
-        <Border x:Name="SummaryPanel" DockPanel.Dock="Right" Width="360" Background="{StaticResource Panel}"
+        <Border x:Name="SummaryPanel" DockPanel.Dock="Right" Width="400" Background="{StaticResource Panel}"
                 BorderBrush="{StaticResource Border}" BorderThickness="1,0,0,0" Visibility="Collapsed">
             <DockPanel>
                 <StackPanel DockPanel.Dock="Top" Margin="14,12,14,6">
                     <TextBlock x:Name="SummaryTitle" FontSize="15" FontWeight="SemiBold" Text="Time per app"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,8,0,4">
+                        <RadioButton x:Name="ModeApps" Content="Apps" IsChecked="True" GroupName="SummaryMode" Padding="12,4" Margin="0,0,4,0"/>
+                        <RadioButton x:Name="ModeTopics" Content="Topics" GroupName="SummaryMode" Padding="12,4" Margin="0,0,4,0"/>
+                        <RadioButton x:Name="ModePlan" Content="Plan" GroupName="SummaryMode" Padding="12,4"/>
+                    </StackPanel>
                     <TextBlock x:Name="SummarySubtitle" Foreground="{StaticResource Muted}" FontSize="12" TextWrapping="Wrap" Margin="0,2,0,0"/>
                 </StackPanel>
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="14,0,14,14">

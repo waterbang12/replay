@@ -1,4 +1,8 @@
-# Recognizing what you were doing (design notes, not implemented)
+# Recognizing what you were doing (design notes)
+
+> **Status (0.3.0):** approach **A** (window-title log) plus semantic grouping and plan matching are
+> implemented; see the README's "What did I work on?" section. OCR, SIFT/ORB and layout heuristics (B, C, E)
+> are not implemented yet.
 
 Goal: turn a day of recordings into a summary such as
 
