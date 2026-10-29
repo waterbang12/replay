@@ -1,6 +1,8 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/LifeReplay.Analysis/LifeReplay.Analysis.csproj" />
+    <Project Path="src/LifeReplay.Coach/LifeReplay.Coach.csproj" />
+    <Project Path="src/LifeReplay.CoachTray/LifeReplay.CoachTray.csproj" />
     <Project Path="src/LifeReplay.Core/LifeReplay.Core.csproj" />
     <Project Path="src/LifeReplay.Recorder/LifeReplay.Recorder.csproj" />
     <Project Path="src/LifeReplay.Sync/LifeReplay.Sync.csproj" />

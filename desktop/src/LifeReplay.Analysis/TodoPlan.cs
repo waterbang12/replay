@@ -12,6 +12,8 @@ public sealed class PlanTask
     public int? ProgressTotal { get; init; }
     public string? ProgressUnit { get; init; }
     public bool Done { get; init; }
+    /// <summary>Optional git repository whose commits count as verified output for this task.</summary>
+    public string? Repo { get; init; }
 }
 
 /// <summary>
@@ -35,7 +37,7 @@ public sealed partial class TodoPlan
     [GeneratedRegex(@"^\s*#{1,3}\s*(.+?)\s*$")] private static partial Regex Heading();
     [GeneratedRegex(@"^\s*[-*]\s*\[( |x|X)\]\s*(.+?)\s*$")] private static partial Regex Checkbox();
     [GeneratedRegex(@"\s~\s*((?:\d+(?:\.\d+)?\s*h)?\s*(?:\d+\s*m(?:in)?)?)\s*$", RegexOptions.IgnoreCase)] private static partial Regex Estimate();
-    [GeneratedRegex(@"^\s*(match|progress|hours)\s*:\s*(.+?)\s*$", RegexOptions.IgnoreCase)] private static partial Regex Property();
+    [GeneratedRegex(@"^\s*(match|progress|hours|repo)\s*:\s*(.+?)\s*$", RegexOptions.IgnoreCase)] private static partial Regex Property();
     [GeneratedRegex(@"^(\d+)\s*/\s*(\d+)\s*(.*)$")] private static partial Regex Progress();
     [GeneratedRegex(@"^(\d{1,2}:\d{2})\s*[-–~]\s*(\d{1,2}:\d{2})$")] private static partial Regex HoursRange();
 
@@ -104,6 +106,8 @@ public sealed partial class TodoPlan
             }
             else if (current != null && key == "match")
                 current.Match.AddRange(value.Split(',').Select(x => x.Trim().Trim('"', '\'')).Where(x => x.Length > 0));
+            else if (current != null && key == "repo")
+                current.Repo = value.Trim().Trim('"', '\'');
             else if (current != null && key == "progress" && Progress().Match(value) is { Success: true } pr)
             {
                 current.ProgressDone = int.Parse(pr.Groups[1].Value);
@@ -115,7 +119,7 @@ public sealed partial class TodoPlan
             plan.Tasks.Add(new PlanTask
             {
                 Title = b.Title, PlannedMs = b.PlannedMs, Match = b.Match, Done = b.Done,
-                ProgressDone = b.ProgressDone, ProgressTotal = b.ProgressTotal, ProgressUnit = b.ProgressUnit,
+                ProgressDone = b.ProgressDone, ProgressTotal = b.ProgressTotal, ProgressUnit = b.ProgressUnit, Repo = b.Repo,
             });
         return plan;
     }
@@ -151,6 +155,7 @@ public sealed partial class TodoPlan
         Optional lines under a task:
           match: words, that, identify, it     (exact keywords; otherwise matched by meaning)
           progress: 3/10 levels                (lets LifeReplay estimate the time left at your pace)
+          repo: C:\path\to\project            (today's commits there count as verified output for the coach)
         -->
         """;
 
@@ -162,5 +167,6 @@ public sealed partial class TodoPlan
         public int? ProgressDone, ProgressTotal;
         public string? ProgressUnit;
         public bool Done;
+        public string? Repo;
     }
 }

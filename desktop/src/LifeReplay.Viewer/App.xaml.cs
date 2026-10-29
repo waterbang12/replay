@@ -34,6 +34,7 @@ public partial class App : Application
             var window = new MainWindow(paths, store, day, time);
             MainWindow = window;
             window.Show();
+            if (e.Args.Contains("--coach")) window.ShowCoach();
         }
         catch (Exception ex)
         {

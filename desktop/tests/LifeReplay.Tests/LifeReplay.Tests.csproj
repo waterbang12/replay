@@ -14,5 +14,6 @@
     <ProjectReference Include="..\..\src\LifeReplay.Core\LifeReplay.Core.csproj" />
     <ProjectReference Include="..\..\src\LifeReplay.Sync\LifeReplay.Sync.csproj" />
     <ProjectReference Include="..\..\src\LifeReplay.Analysis\LifeReplay.Analysis.csproj" />
+    <ProjectReference Include="..\..\src\LifeReplay.Coach\LifeReplay.Coach.csproj" />
   </ItemGroup>
 </Project>

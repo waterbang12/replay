@@ -36,6 +36,7 @@ public partial class MainWindow
         ModeTopics.Checked += (_, _) => UpdateSummary();
         ModePlan.Checked += (_, _) => UpdateSummary();
         ModePhone.Checked += (_, _) => UpdateSummary();
+        ModeCoach.Checked += (_, _) => UpdateSummary();
         SummaryButton.Unchecked += (_, _) => _analysis?.Unload(); // free the model's memory when the panel closes
         Closed += (_, _) => { _analysis?.Dispose(); _todoWatcher?.Dispose(); };
         WatchTodo();
@@ -58,6 +59,7 @@ public partial class MainWindow
         if (ModeTopics.IsChecked == true) _ = RenderTopicsAsync();
         else if (ModePlan.IsChecked == true) _ = RenderPlanAsync();
         else if (ModePhone.IsChecked == true) RenderPhone();
+        else if (ModeCoach.IsChecked == true) _ = RenderCoachAsync();
         else RenderApps();
     }
 

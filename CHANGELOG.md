@@ -2,6 +2,48 @@
 
 Each entry says what changed and why it was needed.
 
+## 0.5.0 — 2026-10-29
+
+### Added
+- **Coach: deterministic schedule evaluation** (`LifeReplay.Coach`): on_track / ahead / behind /
+  insufficient_evidence per task and per day, computed only from verified outputs (ticked tasks,
+  `progress: x/y`, and commits through a new `repo:` line). It also gives a confidence, warns when the plan
+  doesn't fit the time left, and shows YouTube/social drift and goals (`goal: … by yyyy-mm-dd`).
+  *Why:* the Plan view's ahead/behind counted time in apps. Time isn't progress, and the coach is meant to track
+  what was actually done.
+- **Optional AI suggestions** (morning plan, check-in, end-of-day review) over the OpenAI Responses API with
+  strict structured output. Tested with BAZE (`gpt-6-astra`).
+  - **Before sending:** a preview of the exact payload, and nothing is sent without a click.
+  - **Checks on the answer:** cited evidence must exist, every number must appear in the data, a counterpoint is
+    required, and actions are limited. A failing answer gets one retry with the reasons, then the rule-based
+    fallback.
+  - **Limits:** timeouts, retries only for network/5xx/429, and monthly and daily caps in credits.
+  - **Logging:** every payload is stored in the audit log.
+
+  *Why:* to catch made-up claims cheaply in code rather than with more model calls, to counter the model simply
+  agreeing with you, and to keep spending predictable.
+- **Sanitized context**:
+  - never sent: video, screenshots, window titles, URLs or paths;
+  - removed from task titles: URLs, e-mail addresses, CTF flags, credentials, paths and key-like tokens;
+  - optional: redacting task titles, and sending commit messages (off by default).
+
+  *Why:* a public repo and a personal activity log; only the minimum should leave the PC, and only on request.
+- **Notifications** from a separate `LifeReplay.CoachTray.exe`:
+  - behind, drift and overcommitted triggers;
+  - quiet hours, cooldown, a daily maximum, snooze, "quiet for today", and dismissed tasks not named again.
+
+  *Why:* reminders must not depend on a model, and a coach crash must never touch the recorder.
+- **Outcomes and calibration:** an hour after a "focus on X" suggestion, the window log shows whether you did.
+  The planned vs. actual time of finished tasks gives your estimate ratio (14 days).
+  *Why:* to judge the coach by results, and to plan with your real pace.
+- **Private ledger** of finished work with its evidence and a "show" switch, off by default.
+  *Why:* the basis for showing what you can do, without publishing anything by accident.
+- **ChatGPT copy/paste bridge:** copy a context pack, refine the plan in the ChatGPT website (no API credits),
+  then paste the validated plan block back into the todo list after a click, with a backup.
+- **Schema v5:** `coach_requests`, `coach_interventions`, `coach_feedback`, `coach_outcomes`,
+  `coach_evaluations`, `coach_ledger`.
+- **Tests:** 54 coach tests, 155 in total.
+
 ## 0.4.0 — 2026-10-29
 
 ### Removed

@@ -125,6 +125,81 @@ public static class Migrations
             );
             CREATE INDEX ix_app_events_ts ON app_events(ts_utc);
             """),
+        // AI coach (LifeReplay.Coach). Only these tables are written by the coach; recording data is read-only to it.
+        (5, """
+            -- Every request that was (or would have been) sent: exact payload, outcome, credits. The audit log.
+            CREATE TABLE coach_requests (
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_utc    INTEGER NOT NULL,
+                kind           TEXT NOT NULL,
+                model          TEXT NOT NULL,
+                endpoint       TEXT NOT NULL,
+                payload        TEXT NOT NULL,
+                payload_sha256 TEXT NOT NULL,
+                bytes          INTEGER NOT NULL,
+                status         TEXT NOT NULL,
+                attempts       INTEGER NOT NULL DEFAULT 0,
+                credits        INTEGER NOT NULL DEFAULT 0,
+                response       TEXT,
+                error          TEXT
+            );
+            CREATE INDEX ix_coach_requests_created ON coach_requests(created_utc);
+            -- Suggestions and notifications shown to the user, with the evidence they rest on.
+            CREATE TABLE coach_interventions (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_utc  INTEGER NOT NULL,
+                day          TEXT NOT NULL,
+                kind         TEXT NOT NULL,
+                source       TEXT NOT NULL,
+                state        TEXT NOT NULL,
+                message      TEXT NOT NULL,
+                actions      TEXT NOT NULL,
+                evidence     TEXT NOT NULL,
+                counterpoint TEXT,
+                confidence   TEXT,
+                task_id      TEXT,
+                request_id   INTEGER REFERENCES coach_requests(id) ON DELETE SET NULL
+            );
+            CREATE INDEX ix_coach_interventions_day ON coach_interventions(day);
+            CREATE TABLE coach_feedback (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                intervention_id INTEGER NOT NULL REFERENCES coach_interventions(id) ON DELETE CASCADE,
+                created_utc     INTEGER NOT NULL,
+                response        TEXT NOT NULL CHECK (response IN ('accepted', 'dismissed', 'snoozed')),
+                note            TEXT
+            );
+            -- What actually happened after a suggestion (measured from the activity log, not asked).
+            CREATE TABLE coach_outcomes (
+                intervention_id INTEGER PRIMARY KEY REFERENCES coach_interventions(id) ON DELETE CASCADE,
+                measured_utc    INTEGER NOT NULL,
+                window_ms       INTEGER NOT NULL,
+                task_id         TEXT,
+                focus_ms        INTEGER NOT NULL,
+                followed        INTEGER NOT NULL
+            );
+            -- Deterministic evaluations, so later reviews and calibration can see how a day unfolded.
+            CREATE TABLE coach_evaluations (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_utc INTEGER NOT NULL,
+                day         TEXT NOT NULL,
+                state       TEXT NOT NULL,
+                confidence  REAL NOT NULL,
+                snapshot    TEXT NOT NULL
+            );
+            CREATE INDEX ix_coach_evaluations_day ON coach_evaluations(day);
+            -- Private ledger of finished work with its evidence. Nothing is "showable" unless you switch it on.
+            CREATE TABLE coach_ledger (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                day          TEXT NOT NULL,
+                task         TEXT NOT NULL,
+                planned_ms   INTEGER,
+                focus_ms     INTEGER NOT NULL,
+                evidence     TEXT NOT NULL,
+                showable     INTEGER NOT NULL DEFAULT 0,
+                created_utc  INTEGER NOT NULL,
+                UNIQUE (day, task)
+            );
+            """),
     ];
 
     public static int LatestVersion => All[^1].Version;

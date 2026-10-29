@@ -114,6 +114,26 @@ Topics and Plan use a small multilingual language model (paraphrase-multilingual
 English, 113 MB, downloaded once from Hugging Face and verified by checksum). It runs on the CPU only while the
 panel is open (~250 MB of memory; 300 titles take about 1 s), and nothing leaves the PC.
 
+## Coach (Summary → Coach)
+
+Shows whether you're on track, judged by **verified outputs**, never by time in an app:
+- what counts: ticked tasks, `progress: x/y` lines, and today's commits in a task's `repo:`;
+- the result: on track / ahead / behind / not enough evidence, with a confidence;
+- warnings when the plan doesn't fit the time left, plus YouTube/social time, goals with deadlines, and how long
+  tasks really take compared with your estimates.
+
+Optional extras:
+- **AI suggestions** (morning plan, check-in, end-of-day review) through an OpenAI-compatible API, e.g. BAZE.
+  - Each request is shown to you before it's sent.
+  - The answer is checked: evidence ids must exist, every number must be in the data, and a counterpoint is
+    required.
+  - Every request is logged, under monthly and daily budget caps.
+  - Video, screenshots, window titles, URLs and paths are never sent.
+- **Notifications** from a small, separate tray app (rules only: quiet hours, cooldown, daily maximum).
+- **Copy/paste bridge** to refine plans in the ChatGPT website without API credits.
+
+Off by default. Details, privacy, costs and tests: [docs/coach.md](docs/coach.md).
+
 **Todo list** (`Documents\LifeReplay\todo.md` by default; "Open todo list" creates it):
 
 ```md

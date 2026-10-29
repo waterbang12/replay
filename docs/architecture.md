@@ -11,7 +11,10 @@ desktop/
                            published to the tailnet with Tailscale Serve. See docs/iphone-shortcuts.md.
   src/LifeReplay.Recorder  LifeReplay.exe: tray app + capture/encode pipeline (WinForms, WinRT, Direct3D 11).
   src/LifeReplay.Viewer    LifeReplay.Viewer.exe: WPF replay app (calendar, timeline, multi-screen playback).
-  tests/LifeReplay.Tests   xUnit tests for Core, Sync and Analysis.
+  src/LifeReplay.Coach     Coach library: deterministic schedule evaluator, notification rules, sanitized context,
+                           OpenAI Responses provider, answer validator, audit log/budget (see docs/coach.md).
+  src/LifeReplay.CoachTray LifeReplay.CoachTray.exe: separate tray process for coach notifications.
+  tests/LifeReplay.Tests   xUnit tests for Core, Sync, Analysis and Coach.
 shared/                    iPhone event protocol (sync-protocol.md).
 ```
 

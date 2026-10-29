@@ -46,14 +46,14 @@ if (-not $SkipTests) {
 Write-Host "`n== Publish to $dist" -ForegroundColor Cyan
 # Empty the folder rather than deleting it: an Explorer window or terminal open in it would block deletion.
 if (Test-Path $dist) {
-    if (Get-Process LifeReplay, LifeReplay.Viewer -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$dist\*" }) {
-        throw "LifeReplay is running from $dist. Exit it (tray > Exit, or: $dist\LifeReplay.exe --shutdown) and run the build again."
+    if (Get-Process LifeReplay, LifeReplay.Viewer, LifeReplay.CoachTray -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$dist\*" }) {
+        throw "LifeReplay is running from $dist. Exit it (tray > Exit, or: $dist\LifeReplay.exe --shutdown; coach tray > Exit coach) and run the build again."
     }
     Get-ChildItem $dist -Force | Remove-Item -Recurse -Force
 }
 $common = @("-c", $Configuration, "-o", $dist, "-r", "win-x64", "-p:DebugType=embedded")
 if ($FrameworkDependent) { $common += @("--self-contained", "false") } else { $common += @("--self-contained", "true") }
-foreach ($proj in @("desktop\src\LifeReplay.Recorder", "desktop\src\LifeReplay.Viewer")) {
+foreach ($proj in @("desktop\src\LifeReplay.Recorder", "desktop\src\LifeReplay.Viewer", "desktop\src\LifeReplay.CoachTray")) {
     & $dotnet publish (Join-Path $root $proj) @common
     if ($LASTEXITCODE -ne 0) { throw "Publish of $proj failed" }
 }

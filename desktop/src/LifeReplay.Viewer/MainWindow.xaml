@@ -70,7 +70,8 @@
                         <RadioButton x:Name="ModeApps" Content="Apps" IsChecked="True" GroupName="SummaryMode" Padding="12,4" Margin="0,0,4,0"/>
                         <RadioButton x:Name="ModeTopics" Content="Topics" GroupName="SummaryMode" Padding="12,4" Margin="0,0,4,0"/>
                         <RadioButton x:Name="ModePlan" Content="Plan" GroupName="SummaryMode" Padding="12,4" Margin="0,0,4,0"/>
-                        <RadioButton x:Name="ModePhone" Content="iPhone" GroupName="SummaryMode" Padding="12,4"/>
+                        <RadioButton x:Name="ModePhone" Content="iPhone" GroupName="SummaryMode" Padding="12,4" Margin="0,0,4,0"/>
+                        <RadioButton x:Name="ModeCoach" Content="Coach" GroupName="SummaryMode" Padding="12,4"/>
                     </StackPanel>
                     <TextBlock x:Name="SummarySubtitle" Foreground="{StaticResource Muted}" FontSize="12" TextWrapping="Wrap" Margin="0,2,0,0"/>
                 </StackPanel>

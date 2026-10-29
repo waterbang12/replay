@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- AI coaching: deterministic schedule evaluation, sanitized model requests, notification rules, outcome logging.
+       A plain library with no Windows APIs, so a coach failure can't touch the recorder (a separate process). -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\LifeReplay.Core\LifeReplay.Core.csproj" />
+    <ProjectReference Include="..\LifeReplay.Analysis\LifeReplay.Analysis.csproj" />
+  </ItemGroup>
+</Project>
