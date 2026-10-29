@@ -18,6 +18,7 @@
                     <TextBlock Text="Show" Margin="16,0,6,0" Foreground="{StaticResource Muted}"/>
                     <ComboBox x:Name="ViewCombo" Width="250"/>
                     <Button x:Name="RefreshButton" Content="Refresh" Margin="10,0,0,0" ToolTip="Reload recordings (F5)"/>
+                    <ToggleButton x:Name="SummaryButton" Content="Summary" Margin="6,0,0,0" Padding="10,4" ToolTip="Time per app and tab for this day"/>
                     <Menu Background="Transparent" VerticalAlignment="Center" Margin="6,0,0,0">
                         <MenuItem x:Name="DeleteMenu" Header="Delete ▾" Foreground="{StaticResource Fg}" Padding="10,5"
                                   BorderBrush="{StaticResource Border}" BorderThickness="1" Background="#34343A">
@@ -57,6 +58,20 @@
                     </StackPanel>
                 </DockPanel>
             </StackPanel>
+        </Border>
+
+        <!-- Time per app / tab (window-title log) -->
+        <Border x:Name="SummaryPanel" DockPanel.Dock="Right" Width="360" Background="{StaticResource Panel}"
+                BorderBrush="{StaticResource Border}" BorderThickness="1,0,0,0" Visibility="Collapsed">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Top" Margin="14,12,14,6">
+                    <TextBlock x:Name="SummaryTitle" FontSize="15" FontWeight="SemiBold" Text="Time per app"/>
+                    <TextBlock x:Name="SummarySubtitle" Foreground="{StaticResource Muted}" FontSize="12" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                </StackPanel>
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="14,0,14,14">
+                    <StackPanel x:Name="SummaryList"/>
+                </ScrollViewer>
+            </DockPanel>
         </Border>
 
         <!-- Video area -->

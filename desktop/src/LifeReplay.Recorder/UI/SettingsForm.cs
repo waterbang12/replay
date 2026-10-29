@@ -38,6 +38,8 @@ internal sealed class SettingsForm : Form
     private readonly NumericUpDown _minFree = Num(0, 10_000);
     private readonly Label _estimate = new() { AutoSize = true, ForeColor = SystemColors.GrayText, MaximumSize = new Size(520, 0) };
 
+    private readonly CheckBox _logTitles = new() { Text = "Log the app and window title in front", AutoSize = true, Name = "LogTitles" };
+    private readonly NumericUpDown _idleMinutes = Num(1, 120);
     private readonly TextBox _excludedApps = Multi();
     private readonly TextBox _excludedTitles = Multi();
     private readonly TextBox _hotkey = new() { Width = 220 };
@@ -81,6 +83,10 @@ internal sealed class SettingsForm : Form
             _estimate,
             Link("Open recordings folder", () => Open(_host.Paths.RecordingsDir))));
         tabs.TabPages.Add(Page("Privacy",
+            Section("App and window title log"), _logTitles,
+            Hint("Records which app and tab / document / file was in front, for the viewer's \"time per app\" summary. Only while recording; excluded windows are logged as (private)."),
+            Row("Count as idle after (minutes)", _idleMinutes),
+            Hint("No keyboard/mouse input and no screen change for this long is not counted as time on an app."),
             Section("Black out the video while these apps are in front"), _excludedApps,
             Hint("One program per line, e.g. KeePass.exe"),
             Section("...or while the window title contains"), _excludedTitles,
@@ -140,6 +146,8 @@ internal sealed class SettingsForm : Form
         _excludedApps.Lines = c.ExcludedProcesses.ToArray();
         _excludedTitles.Lines = c.ExcludedWindowTitles.ToArray();
         _hotkey.Text = c.PauseHotkey;
+        _logTitles.Checked = c.LogWindowTitles;
+        _idleMinutes.Value = Math.Clamp(c.IdleMinutes, 1, 120);
         RecordingHours.TryParse(c.Hours.Start, out var hs);
         RecordingHours.TryParse(c.Hours.End, out var he);
         _hoursStart.Value = DateTime.Today + hs;
@@ -171,6 +179,8 @@ internal sealed class SettingsForm : Form
             ExcludedProcesses = Lines(_excludedApps),
             ExcludedWindowTitles = Lines(_excludedTitles),
             PauseHotkey = _hotkey.Text.Trim(),
+            LogWindowTitles = _logTitles.Checked,
+            IdleMinutes = (int)_idleMinutes.Value,
             Hours = new RecordingHours
             {
                 Enabled = _hoursEnabled.Checked,

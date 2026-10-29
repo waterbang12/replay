@@ -32,6 +32,10 @@ public sealed class RecorderConfig
     /// <summary>Case-insensitive substrings of foreground window titles that blank the video.</summary>
     public List<string> ExcludedWindowTitles { get; set; } = ["InPrivate", "Incognito", "Private Browsing"];
     public string PauseHotkey { get; set; } = "Ctrl+Alt+Shift+P";
+    /// <summary>Log which app and window title is in front (for "time per app / tab" summaries).</summary>
+    public bool LogWindowTitles { get; set; } = true;
+    /// <summary>No input and no screen change for this long counts as idle (not added to app time).</summary>
+    public int IdleMinutes { get; set; } = 5;
     /// <summary>Optional daily recording hours; outside them the recorder stays in the tray but doesn't record.</summary>
     public RecordingHours Hours { get; set; } = new();
     public SyncSettings Sync { get; set; } = new();
@@ -51,6 +55,7 @@ public sealed class RecorderConfig
         MaxStorageGB = Math.Max(0, MaxStorageGB);
         MinFreeDiskGB = Math.Max(0, MinFreeDiskGB);
         ThumbnailIntervalSeconds = Math.Clamp(ThumbnailIntervalSeconds, 5, 600);
+        IdleMinutes = Math.Clamp(IdleMinutes, 1, 120);
         ExcludedProcesses ??= [];
         ExcludedWindowTitles ??= [];
         Sync ??= new SyncSettings();

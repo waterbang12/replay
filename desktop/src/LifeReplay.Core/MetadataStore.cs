@@ -275,6 +275,40 @@ public sealed class MetadataStore
         return list;
     }
 
+    // ---------------------------------------------------------------- focus (window titles)
+
+    public long InsertFocus(FocusRecord f)
+    {
+        using var c = Open();
+        using var cmd = Cmd(c, """
+            INSERT INTO focus_events(device_id, start_utc, end_utc, process, title) VALUES($d, $s, $e, $p, $t);
+            SELECT last_insert_rowid();
+            """, null, ("$d", f.DeviceId), ("$s", f.StartUtcMs), ("$e", f.EndUtcMs), ("$p", f.Process), ("$t", f.Title));
+        return Convert.ToInt64(cmd.ExecuteScalar());
+    }
+
+    public void UpdateFocusEnd(long id, long endMs) =>
+        Exec("UPDATE focus_events SET end_utc = MAX(start_utc, $e) WHERE id = $id", ("$e", endMs), ("$id", id));
+
+    public List<FocusRecord> GetFocusInRange(long startMs, long endMs)
+    {
+        using var c = Open();
+        using var cmd = Cmd(c, """
+            SELECT id, device_id, start_utc, end_utc, process, title FROM focus_events
+            WHERE start_utc < $end AND end_utc > $start ORDER BY start_utc
+            """, null, ("$start", startMs), ("$end", endMs));
+        using var r = cmd.ExecuteReader();
+        var list = new List<FocusRecord>();
+        while (r.Read())
+            list.Add(new FocusRecord { Id = r.GetInt64(0), DeviceId = r.GetString(1), StartUtcMs = r.GetInt64(2), EndUtcMs = r.GetInt64(3), Process = r.GetString(4), Title = r.GetString(5) });
+        return list;
+    }
+
+    public int DeleteFocusBefore(long utcMs) => Exec("DELETE FROM focus_events WHERE end_utc < $t", ("$t", utcMs));
+
+    public int DeleteFocusInRange(long startMs, long endMs) =>
+        Exec("DELETE FROM focus_events WHERE start_utc < $e AND end_utc > $s", ("$s", startMs), ("$e", endMs));
+
     // ---------------------------------------------------------------- deletion
 
     /// <summary>Removes segment and thumbnail rows in one transaction. Files must be deleted by the caller first.</summary>

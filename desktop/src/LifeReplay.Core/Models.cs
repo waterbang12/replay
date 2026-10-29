@@ -140,6 +140,20 @@ public sealed class ThumbnailRecord
     public required string FilePath { get; init; }
 }
 
+/// <summary>A stretch of time during which one window (app + title) was in front and in use.</summary>
+public sealed class FocusRecord
+{
+    public long Id { get; init; }
+    public required string DeviceId { get; init; }
+    public long StartUtcMs { get; init; }
+    public long EndUtcMs { get; set; }
+    /// <summary>Executable name, e.g. "chrome.exe".</summary>
+    public required string Process { get; init; }
+    /// <summary>Window title, or "(private)" for excluded windows.</summary>
+    public required string Title { get; init; }
+    public long DurationMs => Math.Max(0, EndUtcMs - StartUtcMs);
+}
+
 public static class Activity
 {
     public const int BucketMs = 10_000;

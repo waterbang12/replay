@@ -85,6 +85,17 @@ public static class Migrations
                 PRIMARY KEY (segment_id, ts_utc)
             );
             """),
+        (2, """
+            CREATE TABLE focus_events (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                device_id  TEXT NOT NULL,
+                start_utc  INTEGER NOT NULL,
+                end_utc    INTEGER NOT NULL,
+                process    TEXT NOT NULL,
+                title      TEXT NOT NULL
+            );
+            CREATE INDEX ix_focus_start ON focus_events(start_utc);
+            """),
     ];
 
     public static int LatestVersion => All[^1].Version;

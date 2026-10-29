@@ -57,6 +57,15 @@ public sealed class DayTimeline
     public long NowMs { get; }
     public List<TimelineLane> Lanes { get; }
     public List<GapRecord> Gaps { get; }
+    /// <summary>Which app/window was in front (window-title log), sorted by start.</summary>
+    public List<FocusRecord> Focus { get; set; } = [];
+
+    public FocusRecord? FocusAt(long t)
+    {
+        int lo = 0, hi = Focus.Count - 1, found = -1;
+        while (lo <= hi) { int mid = (lo + hi) / 2; if (Focus[mid].StartUtcMs <= t) { found = mid; lo = mid + 1; } else hi = mid - 1; }
+        return found >= 0 && t < Focus[found].EndUtcMs ? Focus[found] : null;
+    }
 
     public DayTimeline(long dayStartMs, long dayEndMs, long nowMs, List<TimelineLane> lanes, List<GapRecord> gaps)
     {

@@ -114,6 +114,8 @@ Changes are applied automatically when the file is saved (or via tray → Reload
 | `excludedWindowTitles` | InPrivate, Incognito, Private Browsing | Same, matched against the foreground window title. |
 | `pauseHotkey` | Ctrl+Alt+Shift+P | Global pause/resume hotkey. |
 | `hours.enabled` / `hours.start` / `hours.end` / `hours.weekdaysOnly` | false / 09:00 / 18:00 / false | Only record during these local hours. |
+| `logWindowTitles` | true | Log which app and window title (tab / document / file) is in front, for the viewer's **Summary** panel and "Apps / tabs" timeline lane. Only while recording; excluded windows appear as "(private)". |
+| `idleMinutes` | 5 | No input and no screen change for this long isn't counted as time on an app. |
 | `sync.enabled` / `sync.port` / `sync.bindAddress` | false / 47800 / 0.0.0.0 | iPhone sync endpoint. |
 
 ## Privacy and security

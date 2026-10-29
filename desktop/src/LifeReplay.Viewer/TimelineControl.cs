@@ -74,6 +74,24 @@ public sealed class TimelineControl : FrameworkElement
 
     private static T Freeze<T>(T f) where T : Freezable { f.Freeze(); return f; }
 
+    private static readonly Color[] AppPalette =
+    [
+        Color.FromRgb(0x5B, 0x6C, 0xD9), Color.FromRgb(0x2E, 0x9E, 0x8F), Color.FromRgb(0xC2, 0x6A, 0x2E), Color.FromRgb(0x9C, 0x4D, 0xB8),
+        Color.FromRgb(0x3F, 0x8F, 0x3A), Color.FromRgb(0xB8, 0x45, 0x5E), Color.FromRgb(0x4A, 0x86, 0xB5), Color.FromRgb(0x8A, 0x7A, 0x2A),
+    ];
+    private readonly Dictionary<string, Brush> _appBrushes = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Stable color per app, so the same app always looks the same.</summary>
+    private Brush AppBrush(string process)
+    {
+        if (_appBrushes.TryGetValue(process, out var b)) return b;
+        uint h = 2166136261;
+        foreach (char c in process.ToLowerInvariant()) h = (h ^ c) * 16777619;
+        b = Freeze(new SolidColorBrush(process == "unknown" ? Color.FromRgb(0x55, 0x55, 0x5C) : AppPalette[h % AppPalette.Length]));
+        _appBrushes[process] = b;
+        return b;
+    }
+
     private static Brush MakeHatch(Color c)
     {
         var g = new GeometryGroup();
@@ -95,7 +113,8 @@ public sealed class TimelineControl : FrameworkElement
             bool newDay = _data == null || value == null || _data.DayStartMs != value.DayStartMs;
             _data = value;
             if (value != null && newDay) { _viewStart = value.DayStartMs; _viewEnd = value.DayEndMs; }
-            Height = AxisHeight + Math.Max(1, value?.Lanes.Count ?? 1) * (LaneHeight + LaneGap) + 8;
+            int lanes = Math.Max(1, value?.Lanes.Count ?? 1) + (value?.Focus.Count > 0 ? 1 : 0);
+            Height = AxisHeight + lanes * (LaneHeight + LaneGap) + 8;
             InvalidateVisual();
         }
     }
@@ -225,6 +244,30 @@ public sealed class TimelineControl : FrameworkElement
             dc.Pop();
         }
 
+        // Apps lane (window-title log): one colored block per app/window, labelled when wide enough.
+        if (_data.Focus.Count > 0)
+        {
+            double top = LaneTop(_data.Lanes.Count);
+            var name = new FormattedText("🗂 Apps / tabs", CultureInfo.CurrentCulture, FlowDirection.LeftToRight, Font, 12, TextBrush, dpi);
+            dc.DrawText(name, new Point(10, top + (LaneHeight - name.Height) / 2));
+            dc.PushClip(clip);
+            dc.DrawRectangle(LaneBrush, null, new Rect(TrackLeft, top, TrackWidth, LaneHeight));
+            foreach (var f in _data.Focus)
+            {
+                if (f.EndUtcMs < _viewStart || f.StartUtcMs > _viewEnd) continue;
+                double x0 = X(f.StartUtcMs), x1 = X(f.EndUtcMs);
+                var r = new Rect(x0, top + 3, Math.Max(1, x1 - x0), LaneHeight - 6);
+                dc.DrawRectangle(AppBrush(f.Process), null, r);
+                if (r.Width > 60)
+                {
+                    var label = new FormattedText(FocusSummary.ItemName(f.Process, f.Title), CultureInfo.CurrentCulture, FlowDirection.LeftToRight, Font, 10.5, Brushes.White, dpi)
+                    { MaxTextWidth = r.Width - 6, MaxLineCount = 1, Trimming = TextTrimming.CharacterEllipsis };
+                    dc.DrawText(label, new Point(r.X + 3, top + (LaneHeight - label.Height) / 2));
+                }
+            }
+            dc.Pop();
+        }
+
         dc.PushClip(clip);
         if (_hover is { } h && h.X >= TrackLeft)
             dc.DrawLine(HoverPen, new Point(h.X, AxisHeight - 4), new Point(h.X, ActualHeight));
@@ -345,6 +388,20 @@ public sealed class TimelineControl : FrameworkElement
         long t = T(p.X);
         int laneIndex = (int)((p.Y - AxisHeight) / (LaneHeight + LaneGap));
         var lanes = _data.Lanes;
+        if (laneIndex == lanes.Count && _data.Focus.Count > 0)
+        {
+            var f = _data.FocusAt(t);
+            _popupImage.Source = null;
+            _popupImage.Visibility = Visibility.Collapsed;
+            _popupText.Text = TimeUtil.ToLocal(t).ToString("HH:mm:ss") + (f == null ? "  ·  no app logged (idle or not recording)"
+                : $"\n{FocusSummary.AppName(f.Process)}: {f.Title}\n{TimeUtil.ToLocal(f.StartUtcMs):HH:mm}–{TimeUtil.ToLocal(f.EndUtcMs):HH:mm} ({TimeUtil.FormatDuration(f.DurationMs)})");
+            _popupText.MaxWidth = 420;
+            _popupText.TextWrapping = TextWrapping.Wrap;
+            _popup.HorizontalOffset = Math.Clamp(p.X - 210, 0, Math.Max(0, ActualWidth - 430));
+            _popup.VerticalOffset = -70;
+            _popup.IsOpen = true;
+            return;
+        }
         // Prefer the lane under the mouse, otherwise the first lane recorded at that time.
         TimelineLane? lane = laneIndex >= 0 && laneIndex < lanes.Count && lanes[laneIndex].SegmentAt(t, _data.NowMs) != null
             ? lanes[laneIndex] : lanes.FirstOrDefault(l => l.SegmentAt(t, _data.NowMs) != null);

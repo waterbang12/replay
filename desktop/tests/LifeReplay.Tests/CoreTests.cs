@@ -202,6 +202,56 @@ public class TimeUtilTests
     }
 }
 
+public class FocusTests
+{
+    [Theory]
+    [InlineData("chrome.exe", "pwn.college - Program Misuse - Google Chrome", "pwn.college - Program Misuse")]
+    [InlineData("msedge.exe", "paper.pdf - Microsoft​ Edge", "paper.pdf")]
+    [InlineData("Code.exe", "● exploit.py - pwn-notes - Visual Studio Code", "exploit.py - pwn-notes")]
+    [InlineData("chrome.exe", "(3) Inbox - Google Chrome", "Inbox")]
+    [InlineData("KakaoTalk.exe", "", "KakaoTalk")]
+    [InlineData("chrome.exe", "통합검색 | 잡코리아 - Chrome", "통합검색 | 잡코리아")]
+    [InlineData("chrome.exe", "a - b - c", "a - b - c")] // dashes that aren't the app name stay
+    public void ItemNamesDropAppSuffixes(string process, string title, string expected) =>
+        Assert.Equal(expected, FocusSummary.ItemName(process, title));
+
+    [Fact]
+    public void SummaryGroupsByAppAndItemAndClipsToRange()
+    {
+        FocusRecord F(long s, long e, string p, string t) => new() { DeviceId = "d", StartUtcMs = s, EndUtcMs = e, Process = p, Title = t };
+        var records = new[]
+        {
+            F(0, 60_000, "chrome.exe", "pwn.college - Google Chrome"),
+            F(60_000, 90_000, "Code.exe", "a.py - proj - Visual Studio Code"),
+            F(90_000, 150_000, "chrome.exe", "pwn.college - Google Chrome"),
+            F(150_000, 400_000, "chrome.exe", "YouTube - Google Chrome"), // clipped at 200 s
+        };
+        var apps = FocusSummary.Summarize(records, 0, 200_000);
+        Assert.Equal("Google Chrome", apps[0].App);
+        Assert.Equal(170_000, apps[0].DurationMs);
+        Assert.Equal(("pwn.college", 120_000L), (apps[0].Items[0].Item, apps[0].Items[0].DurationMs));
+        Assert.Equal(("VS Code", 30_000L), (apps[1].App, apps[1].DurationMs));
+    }
+
+    [Fact]
+    public void FocusEventsRoundTripAndFocusAt()
+    {
+        using var t = new TempData();
+        long id = t.Store.InsertFocus(new FocusRecord { DeviceId = "d", StartUtcMs = 1000, EndUtcMs = 1000, Process = "chrome.exe", Title = "x" });
+        t.Store.UpdateFocusEnd(id, 5000);
+        t.Store.InsertFocus(new FocusRecord { DeviceId = "d", StartUtcMs = 6000, EndUtcMs = 9000, Process = "Code.exe", Title = "y" });
+        var all = t.Store.GetFocusInRange(0, 10_000);
+        Assert.Equal(2, all.Count);
+        Assert.Equal(4000, all[0].DurationMs);
+        var tl = new DayTimeline(0, 10_000, 10_000, [], []) { Focus = all };
+        Assert.Equal("chrome.exe", tl.FocusAt(3000)?.Process);
+        Assert.Null(tl.FocusAt(5500));
+        Assert.Equal("Code.exe", tl.FocusAt(8999)?.Process);
+        t.Store.DeleteFocusInRange(0, 5500);
+        Assert.Single(t.Store.GetFocusInRange(0, 10_000));
+    }
+}
+
 public class RecordingHoursTests
 {
     private static RecordingHours H(string s, string e, bool weekdays = false) => new() { Enabled = true, Start = s, End = e, WeekdaysOnly = weekdays };

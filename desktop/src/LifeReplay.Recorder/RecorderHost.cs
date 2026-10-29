@@ -24,6 +24,7 @@ internal sealed class RecorderHost : IAsyncDisposable
 
     private readonly ExclusionWatcher _exclusions;
     private readonly DisplayPowerWatcher _displayPower;
+    private readonly FocusTracker _focus;
     private readonly FileSystemWatcher _configWatcher;
     private readonly System.Windows.Forms.Timer _configDebounce;
     private readonly bool _persistConfig;
@@ -47,6 +48,7 @@ internal sealed class RecorderHost : IAsyncDisposable
 
         _exclusions = new ExclusionWatcher(() => Config);
         _exclusions.Changed += match => _ = Controller.SetExclusionAsync(match);
+        _focus = new FocusTracker(this);
         _displayPower = new DisplayPowerWatcher();
         _displayPower.DisplayOffChanged += off => _ = Controller.SetDisplayOffAsync(off);
 
@@ -194,6 +196,7 @@ internal sealed class RecorderHost : IAsyncDisposable
         SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
         SystemEvents.SessionEnding -= OnSessionEnding;
         _exclusions.Dispose();
+        _focus.Dispose();
         _displayPower.Dispose();
         _configWatcher.Dispose();
         _configDebounce.Dispose();

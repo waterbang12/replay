@@ -101,7 +101,11 @@ public static class RecordingDeleter
     {
         var items = store.GetSegmentsWhere("1 = 1").Select(s => new RetentionItem(s.Id, s.StartUtcMs, s.FileSize ?? 0, s.Status));
         var plan = Retention.Plan(items, nowMs, cfg.RetentionDays, (long)(cfg.MaxStorageGB * 1024 * 1024 * 1024));
-        if (cfg.RetentionDays > 0) store.DeleteGapsBefore(nowMs - cfg.RetentionDays * 86_400_000L);
+        if (cfg.RetentionDays > 0)
+        {
+            store.DeleteGapsBefore(nowMs - cfg.RetentionDays * 86_400_000L);
+            store.DeleteFocusBefore(nowMs - cfg.RetentionDays * 86_400_000L);
+        }
         if (plan.Count == 0) return new Result(0, 0, 0);
         var r = DeleteSegments(store, paths, plan);
         Log.Info($"Retention: deleted {r.Deleted} segment(s), freed {TimeUtil.FormatBytes(r.BytesFreed)}, skipped {r.Skipped}");

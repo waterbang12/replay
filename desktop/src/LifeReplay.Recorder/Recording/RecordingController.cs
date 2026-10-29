@@ -56,6 +56,12 @@ internal sealed class RecordingController : IAsyncDisposable
         get { lock (_pipelines) return _pipelines.Select(p => (p.Monitor.FriendlyName, p.Plan, p.Hardware)).ToList(); }
     }
 
+    /// <summary>Total frames Windows has delivered on all displays; changes whenever anything on screen changes.</summary>
+    public long TotalFramesArrived
+    {
+        get { lock (_pipelines) return _pipelines.Sum(p => Interlocked.Read(ref p.Capture.FramesArrived)); }
+    }
+
     public RecordingController(RecorderContext ctx, RecorderConfig cfg)
     {
         _ctx = ctx;
