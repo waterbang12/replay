@@ -1,0 +1,21 @@
+# Build output
+bin/
+obj/
+dist/
+*.user
+.vs/
+TestResults/
+
+# Runtime data if LIFEREPLAY_DATA points inside the repo (never commit recordings)
+recordings/
+database/
+logs/
+status.json
+device-id.txt
+sync/
+
+# Xcode
+ios/*.xcodeproj
+ios/build/
+DerivedData/
+xcuserdata/

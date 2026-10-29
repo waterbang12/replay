@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/LifeReplay.Core/LifeReplay.Core.csproj" />
+    <Project Path="src/LifeReplay.Recorder/LifeReplay.Recorder.csproj" />
+    <Project Path="src/LifeReplay.Sync/LifeReplay.Sync.csproj" />
+    <Project Path="src/LifeReplay.Viewer/LifeReplay.Viewer.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/LifeReplay.Tests/LifeReplay.Tests.csproj" />
+  </Folder>
+</Solution>

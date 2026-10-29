@@ -1,0 +1,12 @@
+<Project>
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <Version>0.1.0</Version>
+    <Authors>LifeReplay</Authors>
+    <!-- Windows 11 SDK projections (Windows.Graphics.Capture, Media Foundation transcoder). Runs on Windows 10 2004+. -->
+    <LifeReplayWinTfm>net10.0-windows10.0.26100.0</LifeReplayWinTfm>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,43 @@
+# XcodeGen spec: run `xcodegen generate` in this folder on a Mac to create LifeReplay.xcodeproj.
+# Before building: set DEVELOPMENT_TEAM, change the bundle id prefix, and register the App Group
+# (must match AppGroup.appGroupId in Shared/Shared.swift).
+name: LifeReplay
+options:
+  bundleIdPrefix: com.example
+  deploymentTarget:
+    iOS: "16.0"
+settings:
+  base:
+    DEVELOPMENT_TEAM: ""
+    SWIFT_VERSION: "5.9"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  LifeReplay:
+    type: application
+    platform: iOS
+    sources:
+      - LifeReplay
+      - Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.lifereplay
+        INFOPLIST_FILE: LifeReplay/Info.plist
+        CODE_SIGN_ENTITLEMENTS: LifeReplay/LifeReplay.entitlements
+        TARGETED_DEVICE_FAMILY: "1"
+    dependencies:
+      - target: BroadcastExtension
+        embed: true
+  BroadcastExtension:
+    type: app-extension
+    platform: iOS
+    sources:
+      - BroadcastExtension
+      - Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.lifereplay.BroadcastExtension
+        INFOPLIST_FILE: BroadcastExtension/Info.plist
+        CODE_SIGN_ENTITLEMENTS: BroadcastExtension/BroadcastExtension.entitlements
+        TARGETED_DEVICE_FAMILY: "1"
+        APPLICATION_EXTENSION_API_ONLY: YES
