@@ -2,6 +2,63 @@
 
 Each entry says what changed and why it was needed.
 
+## Planned (not started): ideas and open issues
+
+### Reminders away from the PC: phone push or a small desk device
+*Why:* coach notifications currently only appear on the PC. Being late or off schedule matters most when you're not
+at it.
+- **What's already there:** the trigger. `InterventionPolicy` already decides when to remind (behind, drift,
+  overcommitted; quiet hours, cooldown, daily maximum, snooze), with no model call. This only needs new *output
+  channels*.
+- **Phone options:**
+  - **Telegram bot.** Simplest and reliable on iPhone; free.
+  - **ntfy app.** On iOS its push notifications go through ntfy.sh's servers even when you host it yourself.
+  - **Pushover.** Paid once.
+  - Each sends a short text ("Behind by 40 min on t2"). That text passes through the service, so task titles should
+    be redacted by default.
+- **Desk device options:**
+  - an ESP32 with an LED ring, small e-ink screen or buzzer: green = on track, yellow = not enough evidence,
+    red = behind;
+  - fed over USB serial from the coach tray (no network, nothing to secure), or polled over the home Wi-Fi with a
+    token;
+  - a smartwatch comes for free through the phone channel.
+- **Open issues:**
+  - When the PC is off or asleep, nothing evaluates, so no reminders. A phone-only fallback would need the plan
+    synced to the phone (e.g. calendar alarms created after approval).
+  - A device must never become a way to read activity data. It only receives a state and a short message.
+  - Avoid duplicate alerts on PC and phone.
+  - Measure whether reminders work (the outcome is already logged per notification) and turn off a channel that
+    doesn't help.
+
+### GPS and a "race replay" of the day
+*Why:* to see the whole day (where you were, how you moved, what was on screen at each point) as one replay, like
+the replay of a race in a racing game.
+- **Location source:**
+  - Shortcuts can't log location continuously. It only runs on events like arriving at or leaving a place, or at
+    set times.
+  - Open-source iOS loggers can POST batches of locations to an HTTP endpoint: **Overland** (by Aaron Parecki) and
+    **OwnTracks** (HTTP mode). That fits the existing iPhone endpoint and token: a new `POST /api/v1/locations`
+    with the same validation and dedupe.
+  - Google Maps Timeline can be exported as JSON and imported afterwards.
+- **Replay view:**
+  - a map with the day's path drawn progressively in sync with the timeline playhead;
+  - a moving marker with speed, places (home, school, café) clustered from stays, and the active app or screen
+    thumbnail at that moment;
+  - play / 4× / 16× like the video;
+  - "ghost" comparison with another day.
+
+  A **map-free mode** (a place graph: home → campus → library, with durations) needs no map tiles and shows less.
+- **Open issues:**
+  - **Privacy:** location is the most sensitive data here. Keep it local only, never send it to the coach model, and
+    give it its own retention setting. Excluded zones (e.g. home) should be stored as a place name only.
+  - **Map tiles:** OpenStreetMap's tile servers have a usage policy (no heavy use, attribution required). Offline
+    tiles (MBTiles) would avoid that but take disk space.
+  - **Battery and accuracy:** continuous GPS drains the phone; loggers trade accuracy for battery. Location is poor
+    indoors and between buildings.
+  - **Time alignment:** phone and PC clocks; the existing clock-skew handling would apply.
+  - **Not tested:** none of this has been tried on a device. Overland and OwnTracks behaviour would need the same
+    kind of real-device test as the Shortcuts integration.
+
 ## 0.5.0 — 2026-10-29
 
 ### Added
