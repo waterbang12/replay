@@ -13,8 +13,8 @@ public sealed record TitleItem(string App, string Item, long DurationMs, long Fi
         : Item.Length < 12 && !Item.Contains(' ') ? $"{Item} ({App})" : Item;
 }
 
-/// <summary>A group of windows. <see cref="Category"/> is YouTube, Social, or Other (the topic-sorted rest).</summary>
-public sealed record Topic(string Label, long DurationMs, List<TitleItem> Items, string Category = FixedCategories.Other);
+/// <summary>A group of windows. <see cref="Category"/> is a <see cref="ProgressKinds"/> value.</summary>
+public sealed record Topic(string Label, long DurationMs, List<TitleItem> Items, string Category = ProgressKinds.Unsorted);
 
 public enum MatchHow { Keyword, Learned, Meaning, Context, Manual }
 
@@ -98,22 +98,50 @@ public static class DayAnalysis
     }
 
     /// <summary>
-    /// YouTube and Social first (one group each), then everything else grouped by topic.
-    /// <paramref name="vectorsFor"/> is only called for the "Other" windows.
+    /// Sorts every window into Progress / Not progress / Unsorted (<see cref="ProgressKinds"/>), then groups the
+    /// windows of each kind by meaning. A window you didn't sort yourself follows the most similar window you did
+    /// sort (cosine ≥ <see cref="LearnedThreshold"/>), before the built-in rules.
+    /// Only the 600 longest-used windows get vectors; the rest are sorted by rule into "Other windows".
     /// </summary>
-    public static List<Topic> Categorize(IReadOnlyList<TitleItem> items, Func<IReadOnlyList<TitleItem>, IReadOnlyList<float[]>> vectorsFor)
+    public static List<Topic> Categorize(IReadOnlyList<TitleItem> items, Func<IReadOnlyList<string>, IReadOnlyList<float[]>> vectorsFor,
+        IReadOnlyDictionary<string, string>? manual = null)
     {
-        var result = new List<Topic>();
-        foreach (var fixedCat in new[] { FixedCategories.YouTube, FixedCategories.Social })
+        manual ??= new Dictionary<string, string>();
+        var ordered = items.OrderByDescending(i => i.DurationMs).ToList();
+        var top = ordered.Take(600).ToList();
+        var sorted = manual.Where(m => ProgressKinds.IsKind(m.Value)).ToList();
+        var texts = top.Select(i => i.Text).Concat(sorted.Select(m => m.Key)).Distinct().ToList();
+        var vecList = texts.Count > 0 ? vectorsFor(texts) : [];
+        var vec = new Dictionary<string, float[]>();
+        for (int i = 0; i < texts.Count; i++) vec[texts[i]] = vecList[i];
+
+        string KindOf(TitleItem item)
         {
-            var members = items.Where(i => FixedCategories.Of(i) == fixedCat).OrderByDescending(i => i.DurationMs).ToList();
-            if (members.Count > 0) result.Add(new Topic(fixedCat, members.Sum(m => m.DurationMs), members, fixedCat));
+            if (manual.TryGetValue(item.Text, out var k) && ProgressKinds.IsKind(k)) return k;
+            if (vec.TryGetValue(item.Text, out var v))
+            {
+                float best = LearnedThreshold;
+                string? kind = null;
+                foreach (var (text, kk) in sorted)
+                {
+                    if (!vec.TryGetValue(text, out var lv)) continue;
+                    float s = SentenceEmbedder.Cosine(v, lv);
+                    if (s >= best) { best = s; kind = kk; }
+                }
+                if (kind != null) return kind;
+            }
+            return ProgressKinds.Rule(item);
         }
-        var rest = items.Where(i => FixedCategories.Of(i) == FixedCategories.Other).ToList();
-        if (rest.Count > 0)
+
+        var result = new List<Topic>();
+        var topSet = top.ToHashSet();
+        foreach (var group in ordered.GroupBy(KindOf).OrderBy(g => Array.IndexOf(ProgressKinds.All, g.Key)))
         {
-            var clustered = rest.Take(300).ToList();
-            result.AddRange(FindTopics(rest, vectorsFor(clustered)));
+            var withVec = group.Where(topSet.Contains).ToList();
+            var topics = withVec.Count > 0 ? FindTopics(withVec, withVec.Select(i => vec[i.Text]).ToList()) : [];
+            var rest = group.Where(i => !topSet.Contains(i)).ToList();
+            if (rest.Count > 0) topics.Add(new Topic("Other windows", rest.Sum(r => r.DurationMs), rest));
+            result.AddRange(topics.OrderByDescending(t => t.DurationMs).Select(t => t with { Category = group.Key }));
         }
         return result;
     }

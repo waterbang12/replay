@@ -4,7 +4,7 @@ Test machine: Windows 11 Home 10.0.26200, Intel Arc integrated GPU (hardware H.2
 one 1920×1200 monitor, .NET 10.0.403 SDK. All results below are from real runs on this machine on 2026-10-27.
 Nothing here is simulated, except that `curl` stood in for the iPhone.
 
-## Automated tests: 155 passed, 0 failed (2026-10-29)
+## Automated tests: 165 passed, 0 failed (2026-10-31)
 
 The coach's 54 tests and its real end-to-end requests are listed in [coach.md](coach.md#tests).
 

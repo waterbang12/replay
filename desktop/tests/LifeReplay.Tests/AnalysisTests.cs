@@ -146,21 +146,53 @@ public class DayAnalysisTests
     public void FixedCategoriesFromAppAndTitle(string app, string item, string expected) =>
         Assert.Equal(expected, FixedCategories.Of(new TitleItem(app, item, 1, 0)));
 
+    [Theory]
+    [InlineData("Google Chrome", "검은화면 [유튜브 알람] 1시간 뒤에 깨워드릴게요 - YouTube", "not_progress")]
+    [InlineData("Google Chrome", "All Phillip Graves Cutscenes - Call of Duty - YouTube", "not_progress")]
+    [InlineData("Google Chrome", "MIT 6.006 Lecture 3 - YouTube", "progress")]
+    [InlineData("KakaoTalk", "은혜", "not_progress")]
+    [InlineData("Steam", "Steam", "not_progress")]
+    [InlineData("Google Chrome", "pwn.college - Program Misuse", "progress")]
+    [InlineData("VS Code", "exploit.py - pwn-notes", "progress")]
+    [InlineData("Google Chrome", "ChatGPT", "unsorted")]
+    public void ProgressRulesFromAppAndTitle(string app, string item, string expected) =>
+        Assert.Equal(expected, ProgressKinds.Rule(new TitleItem(app, item, 1, 0)));
+
     [Fact]
-    public void CategorizeKeepsFixedGroupsAndClustersTheRest()
+    public void CategorizeSortsByKindThenClustersEachKind()
     {
         var items = new List<TitleItem>
         {
             new("Chrome", "video - YouTube", 40, 0), new("KakaoTalk", "KakaoTalk", 10, 0),
-            new("Chrome", "pwn A", 30, 0), new("Chrome", "pwn B", 20, 0), new("Edge", "math", 25, 0),
+            new("Chrome", "pwn.college A", 30, 0), new("Chrome", "pwn.college B", 20, 0), new("Edge", "math", 25, 0),
         };
-        var vec = new Dictionary<string, float[]> { ["pwn A"] = V(1, 0, 0), ["pwn B"] = V(0.95f, 0.05f, 0), ["math"] = V(0, 1, 0) };
-        int clusteredCount = 0;
-        var topics = DayAnalysis.Categorize(items, list => { clusteredCount = list.Count; return list.Select(i => vec[i.Item]).ToList(); });
-        Assert.Equal(3, clusteredCount); // YouTube and Social windows never go through the model
-        Assert.Equal(("YouTube", 40L), (topics[0].Label, topics[0].DurationMs));
-        Assert.Equal(("Social", "Social"), (topics[1].Label, topics[1].Category));
-        Assert.Contains(topics, t => t.Category == "Other" && t.DurationMs == 50);
+        var vec = new Dictionary<string, float[]>
+        {
+            ["video - YouTube"] = V(0, 0, 1), ["KakaoTalk"] = V(0, 0.1f, 1), ["pwn.college A"] = V(1, 0, 0), ["pwn.college B"] = V(0.95f, 0.05f, 0), ["math (Edge)"] = V(0, 1, 0),
+        };
+        var topics = DayAnalysis.Categorize(items, texts => texts.Select(t => vec[t]).ToList());
+        Assert.Equal(["progress", "not_progress", "unsorted"], topics.Select(t => t.Category).Distinct());
+        Assert.Equal(50, topics.Where(t => t.Category == "not_progress").Sum(t => t.DurationMs));
+        Assert.Equal(("pwn.college A", 50L), (topics[0].Label, topics[0].DurationMs)); // the two pwn windows form one topic
+    }
+
+    [Fact]
+    public void YourChoiceWinsAndSimilarWindowsFollowIt()
+    {
+        var items = new List<TitleItem>
+        {
+            new("Chrome", "lofi beats - YouTube", 40, 0),           // rule: not progress; you said progress
+            new("Chrome", "lofi beats 2 - YouTube", 30, 0),         // very similar → follows your choice
+            new("Chrome", "game trailer - YouTube", 20, 0),         // different → rule
+        };
+        var vec = new Dictionary<string, float[]>
+        {
+            ["lofi beats - YouTube"] = V(1, 0, 0), ["lofi beats 2 - YouTube"] = V(0.98f, 0.02f, 0), ["game trailer - YouTube"] = V(0, 1, 0),
+        };
+        var manual = new Dictionary<string, string> { ["lofi beats - YouTube"] = "progress" };
+        var topics = DayAnalysis.Categorize(items, texts => texts.Select(t => vec[t]).ToList(), manual);
+        Assert.Equal(70, topics.Where(t => t.Category == "progress").Sum(t => t.DurationMs));
+        Assert.Equal(20, topics.Where(t => t.Category == "not_progress").Sum(t => t.DurationMs));
     }
 
     [Fact]

@@ -421,6 +421,33 @@ public sealed class MetadataStore
         else Exec("INSERT OR REPLACE INTO title_labels(item, task, created_utc) VALUES($i, $t, $n)", ("$i", item), ("$t", task), ("$n", TimeUtil.NowMs()));
     }
 
+    /// <summary>Your "progress / not_progress / unsorted" choices per window text (Topics view).</summary>
+    public Dictionary<string, string> GetTopicKinds()
+    {
+        using var c = Open();
+        using var cmd = Cmd(c, "SELECT item, kind FROM topic_kinds");
+        using var r = cmd.ExecuteReader();
+        var d = new Dictionary<string, string>();
+        while (r.Read()) d[r.GetString(0)] = r.GetString(1);
+        return d;
+    }
+
+    /// <summary>Sorts these windows into <paramref name="kind"/> (null forgets your choice) in one transaction.</summary>
+    public void SetTopicKinds(IEnumerable<string> items, string? kind)
+    {
+        using var c = Open();
+        using var tx = c.BeginTransaction();
+        long now = TimeUtil.NowMs();
+        foreach (var item in items.Distinct())
+        {
+            using var cmd = kind == null
+                ? Cmd(c, "DELETE FROM topic_kinds WHERE item = $i", tx, ("$i", item))
+                : Cmd(c, "INSERT OR REPLACE INTO topic_kinds(item, kind, created_utc) VALUES($i, $k, $n)", tx, ("$i", item), ("$k", kind), ("$n", now));
+            cmd.ExecuteNonQuery();
+        }
+        tx.Commit();
+    }
+
     // ---------------------------------------------------------------- deletion
 
     /// <summary>Removes segment and thumbnail rows in one transaction. Files must be deleted by the caller first.</summary>

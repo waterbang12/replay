@@ -52,11 +52,11 @@ public sealed class AnalysisService : IDisposable
     {
         var items = DayAnalysis.Items(focus, fromMs, toMs);
         if (items.Count == 0) return [];
-        return DayAnalysis.Categorize(items, list =>
+        return DayAnalysis.Categorize(items, texts =>
         {
-            var v = Vectors(list.Select(i => i.Text));
-            return list.Select(i => v[i.Text]).ToList();
-        });
+            var v = Vectors(texts);
+            return texts.Select(t => v[t]).ToList();
+        }, _store.GetTopicKinds());
     }
 
     public PlanStatus Plan(TodoPlan plan, IReadOnlyList<FocusRecord> focus, long fromMs, long toMs, long nowMs, TimeSpan defaultStart, TimeSpan defaultEnd)

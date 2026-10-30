@@ -8,7 +8,7 @@ public sealed record NotificationDecision(bool Notify, string Reason, string? Me
 /// Deterministic rules for when the coach may interrupt. Checked in order; the first rule that says no wins:
 /// notifications off → quiet hours → outside the working window → daily maximum → cooldown since the last
 /// notification → snoozed → "quiet for today" → low confidence. Then the triggers, most important first:
-/// behind schedule, more than 30 min of YouTube/social in the last hour, plan doesn't fit the time left.
+/// behind schedule, more than 30 min of not-progress windows (videos, games, chat) in the last hour, plan doesn't fit the time left.
 /// A task you dismissed isn't named again that day.
 /// </summary>
 public static class InterventionPolicy
@@ -42,7 +42,7 @@ public static class InterventionPolicy
             if (worst != null || dismissedTasks.Count == 0) return new(true, "behind", msg, worst?.Id, "behind");
         }
         if (ev.DistractionLastHourMs >= DriftThresholdMs && !usedTriggers.Contains("drift"))
-            return new(true, "drift", $"{TimeUtil.FormatDuration(ev.DistractionLastHourMs)} of YouTube/social in the last hour, during working time.", null, "drift");
+            return new(true, "drift", $"{TimeUtil.FormatDuration(ev.DistractionLastHourMs)} of not-progress windows (videos, games, chat) in the last hour, during working time.", null, "drift");
         if (ev.Overcommitted && !usedTriggers.Contains("overcommitted"))
             return new(true, "overcommitted",
                 $"The rest of today's plan ({TimeUtil.FormatDuration(ev.RemainingPlannedMs)}) doesn't fit the working time left ({TimeUtil.FormatDuration(ev.RemainingWorkMs)}). Consider moving something.",

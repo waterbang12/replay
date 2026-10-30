@@ -59,6 +59,21 @@ the replay of a race in a racing game.
   - **Not tested:** none of this has been tried on a device. Overland and OwnTracks behaviour would need the same
     kind of real-device test as the Shortcuts integration.
 
+## 0.5.1 — 2026-10-31
+
+- **Topics: Progress / Not progress / Unsorted instead of YouTube / Social / Other.** *Why:* "YouTube 3h" said
+  nothing about whether the time moved anything forward, and the list was too long to read.
+  - Rules first: code editors, terminals, PDFs, GitHub, pwn.college, arXiv are progress. Videos, games, chat and
+    streaming sites are not. A YouTube video counts as progress only when its title says lecture, tutorial,
+    강의 and similar.
+  - **Move to** on a topic, or right-clicking a window, saves your choice (new table `topic_kinds`, schema v6).
+    Windows at least 0.80 similar to one you sorted follow your choice before the rules.
+  - Sections and topics are collapsible and closed by default. They stay open or closed while the viewer runs.
+  - The coach's "drift" time now uses the same sorting, so game videos count and lectures don't.
+- Tests: 165 (rules, your choices beating rules, similar windows following them, saving the choices).
+- Known issue: `CoachServiceTests.ValidAnswerIsStoredWithItsRequestAndAuditPayload` failed once in about 7 runs
+  around midnight and passed on every rerun. Not investigated yet.
+
 ## 0.5.0 — 2026-10-29
 
 ### Added

@@ -32,7 +32,7 @@ todo.md + window log + git ──► ScheduleEvaluator ──► state: on_track
 
 **Viewer → Summary → Coach** (or the coach tray icon → Open coach):
 - **Evaluation:** the day's state, confidence, each task's verified output, and warnings. It warns when the
-  rest of the plan doesn't fit the working time left, and shows YouTube/social time, goals and their deadlines,
+  rest of the plan doesn't fit the working time left, and shows not-progress time (Topics view), goals and their deadlines,
   and calibration.
 - **Requests:** **Morning plan**, **Check now** and **End-of-day review** show the request preview; nothing is
   sent until you click **Send**.
@@ -95,7 +95,7 @@ The rules are checked in order, and the first one that says no wins:
 
 When nothing blocks, the first trigger that applies fires:
 - **behind schedule:** the notification names the task furthest behind, unless you dismissed that task today;
-- **more than 30 min of YouTube/social in the last hour;**
+- **more than 30 min of not-progress windows (videos, games, chat; as sorted in Topics) in the last hour;**
 - **the plan doesn't fit the time left.**
 
 The drift and overcommitted notifications fire at most once a day. A notification never calls the model.
@@ -197,7 +197,7 @@ Existing tables the coach **reads**:
 
 | Table | Use |
 |---|---|
-| `focus_events` | window log: minutes per task, YouTube/social time |
+| `focus_events` | window log: minutes per task, not-progress time |
 | `title_labels` | your manual window → task assignments (the matcher uses them) |
 | `text_embeddings` | cached title vectors (`CachedPlanMatcher`) |
 

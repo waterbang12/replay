@@ -15,13 +15,15 @@ public sealed class EvaluationInput
     public required TodoPlan Plan { get; init; }
     /// <summary>Time per task from the existing matcher (<see cref="DayAnalysis.Match"/>).</summary>
     public required PlanStatus Status { get; init; }
-    /// <summary>The day's window log (only used for YouTube/Social time; titles never leave the PC).</summary>
+    /// <summary>The day's window log (only used for "not progress" time; titles never leave the PC).</summary>
     public required IReadOnlyList<FocusRecord> Focus { get; init; }
     public required TimeSpan DefaultStart { get; init; }
     public required TimeSpan DefaultEnd { get; init; }
     /// <summary>Commits per task index (only tasks with "repo:").</summary>
     public IReadOnlyDictionary<int, GitActivity> Git { get; init; } = new Dictionary<int, GitActivity>();
     public IReadOnlyList<Goal> Goals { get; init; } = [];
+    /// <summary>Your progress / not-progress choices from the Topics view (exact window text).</summary>
+    public IReadOnlyDictionary<string, string> TopicKinds { get; init; } = new Dictionary<string, string>();
 }
 
 /// <summary>
@@ -139,18 +141,18 @@ public static class ScheduleEvaluator
 
         long unplanned = input.Status.Unassigned.Sum(u => u.Ms);
         var (dayStart, dayEnd) = TimeUtil.LocalDayRange(input.Day);
-        long distraction = DistractionMs(input.Focus, dayStart, Math.Min(dayEnd, now));
-        long distractionHour = DistractionMs(input.Focus, now - 3_600_000, now);
+        long distraction = DistractionMs(input.Focus, dayStart, Math.Min(dayEnd, now), input.TopicKinds);
+        long distractionHour = DistractionMs(input.Focus, now - 3_600_000, now, input.TopicKinds);
         return new DayEvaluation(input.Day, now, winStart, winEnd, dayFraction, remainingWork, dayState, dayConf,
             planned, knownPlanned, verifiedDone, expected, input.Status.SpentOnPlanMs, unplanned, distraction, distractionHour,
             remainingPlanned, overcommitted, tasks, input.Goals, dayReason);
     }
 
-    /// <summary>YouTube + Social time (the fixed categories) inside [from, to).</summary>
-    public static long DistractionMs(IReadOnlyList<FocusRecord> focus, long fromMs, long toMs)
+    /// <summary>"Not progress" time (videos, games, chat; rules plus your Topics choices) inside [from, to).</summary>
+    public static long DistractionMs(IReadOnlyList<FocusRecord> focus, long fromMs, long toMs, IReadOnlyDictionary<string, string>? kinds = null)
     {
         if (toMs <= fromMs) return 0;
-        return DayAnalysis.Items(focus, fromMs, toMs).Where(i => FixedCategories.Of(i) != FixedCategories.Other).Sum(i => i.DurationMs);
+        return DayAnalysis.Items(focus, fromMs, toMs).Where(i => ProgressKinds.Of(i, kinds) == ProgressKinds.NotProgress).Sum(i => i.DurationMs);
     }
 }
 

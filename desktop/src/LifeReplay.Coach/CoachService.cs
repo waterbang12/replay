@@ -263,7 +263,7 @@ public static class CoachDay
         var ev = ScheduleEvaluator.Evaluate(new EvaluationInput
         {
             Day = day, NowMs = nowMs, Plan = plan, Status = status, Focus = focus, DefaultStart = defStart, DefaultEnd = defEnd,
-            Git = gitByIndex, Goals = Goals.Parse(markdown),
+            Git = gitByIndex, Goals = Goals.Parse(markdown), TopicKinds = store.GetTopicKinds(),
         });
         return new DaySnapshot(plan, markdown, status, focus, ev, gitById);
     }

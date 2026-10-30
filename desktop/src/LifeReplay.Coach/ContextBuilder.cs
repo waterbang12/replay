@@ -64,7 +64,7 @@ public static partial class ContextBuilder
             Add($"day: {Min(ev.VerifiedDoneMs)} min verified of {Min(ev.PlannedWithEvidenceMs)} planned with evidence; {Min(ev.ExpectedByNowMs)} min expected by now"),
         };
         if (ev.UnplannedMs > 0) dayIds.Add(Add($"day: {Min(ev.UnplannedMs)} min on windows not matched to any task"));
-        if (ev.DistractionMs > 0) dayIds.Add(Add($"day: {Min(ev.DistractionMs)} min on YouTube/social today, {Min(ev.DistractionLastHourMs)} min in the last hour"));
+        if (ev.DistractionMs > 0) dayIds.Add(Add($"day: {Min(ev.DistractionMs)} min on not-progress windows (videos, games, chat) today, {Min(ev.DistractionLastHourMs)} min in the last hour"));
         if (ev.Overcommitted) dayIds.Add(Add($"day: {Min(ev.RemainingPlannedMs)} min of planned work left but only {Min(ev.RemainingWorkMs)} min of working time"));
         if (estimateRatio is { } r) dayIds.Add(Add($"calibration: finished tasks took {r:0.0}x their planned time over the last 14 days"));
 

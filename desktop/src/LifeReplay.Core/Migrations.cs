@@ -200,6 +200,14 @@ public static class Migrations
                 UNIQUE (day, task)
             );
             """),
+        (6, """
+            -- Topics view: your choice of progress / not_progress / unsorted per window text.
+            CREATE TABLE topic_kinds (
+                item        TEXT PRIMARY KEY,
+                kind        TEXT NOT NULL CHECK (kind IN ('progress', 'not_progress', 'unsorted')),
+                created_utc INTEGER NOT NULL
+            );
+            """),
     ];
 
     public static int LatestVersion => All[^1].Version;

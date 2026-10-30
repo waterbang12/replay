@@ -84,7 +84,7 @@ public partial class MainWindow
         if (ev.Overcommitted)
             SummaryList.Children.Add(Text($"⚠ {TimeUtil.FormatDuration(ev.RemainingPlannedMs)} of planned work left, {TimeUtil.FormatDuration(ev.RemainingWorkMs)} of working time left.", 12.5, color: Brushes.Goldenrod));
         if (ev.DistractionMs > 0)
-            SummaryList.Children.Add(Text($"YouTube / social today: {TimeUtil.FormatDuration(ev.DistractionMs)}" + (ev.DistractionLastHourMs > 0 ? $" ({TimeUtil.FormatDuration(ev.DistractionLastHourMs)} in the last hour)" : ""), 12, color: Muted));
+            SummaryList.Children.Add(Text($"Not progress (videos, games, chat) today: {TimeUtil.FormatDuration(ev.DistractionMs)}" + (ev.DistractionLastHourMs > 0 ? $" ({TimeUtil.FormatDuration(ev.DistractionLastHourMs)} in the last hour)" : ""), 12, color: Muted));
         if (svc.EstimateRatio(day) is { } ratio)
             SummaryList.Children.Add(Text($"Calibration (14 days): finished tasks took {ratio:0.0}× their planned time.", 12, color: Muted));
         foreach (var g in ev.Goals)

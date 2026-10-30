@@ -105,9 +105,11 @@ Windows + iPhone combined (including time when both were in use).
 The viewer's **Summary** button opens a panel with three views of the selected day, built from the window-title log:
 
 - **Apps**: time per app, with the tabs / documents / files under each.
-- **Topics**: totals for **YouTube**, **Social** and **Other** at the top, then YouTube and Social as fixed
-  groups and everything else grouped automatically by *meaning*, so "Domain Theory.pdf", "위상수학 과제.pdf" and "Scott
-  domains.pdf" become one topic even though they share no words. No setup needed.
+- **Topics**: windows sorted into **Progress** (code, papers, pwn.college, lectures…), **Not progress** (videos,
+  games, chat, feeds) and **Unsorted**, each a collapsible section. Inside, windows are grouped by *meaning*, so
+  "Domain Theory.pdf", "위상수학 과제.pdf" and "Scott domains.pdf" become one topic even though they share no words.
+  Topics are collapsed too; open one to see its windows. If a topic is in the wrong section, use **Move to** (or
+  right-click a window). Your choice is saved, and similar windows follow it.
 - **Plan**: your todo list with time per task and **ahead / behind schedule** for today.
 
 Topics and Plan use a small multilingual language model (paraphrase-multilingual-MiniLM-L12-v2, Korean +
@@ -119,7 +121,7 @@ panel is open (~250 MB of memory; 300 titles take about 1 s), and nothing leaves
 Shows whether you're on track, judged by **verified outputs**, never by time in an app:
 - what counts: ticked tasks, `progress: x/y` lines, and today's commits in a task's `repo:`;
 - the result: on track / ahead / behind / not enough evidence, with a confidence;
-- warnings when the plan doesn't fit the time left, plus YouTube/social time, goals with deadlines, and how long
+- warnings when the plan doesn't fit the time left, plus not-progress time, goals with deadlines, and how long
   tasks really take compared with your estimates.
 
 Optional extras:

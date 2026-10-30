@@ -43,6 +43,18 @@ public class MigrationTests
 public class MetadataStoreTests
 {
     [Fact]
+    public void TopicKindsAreSavedReplacedAndForgotten()
+    {
+        using var t = new TempData();
+        t.Store.SetTopicKinds(["a", "b"], "progress");
+        t.Store.SetTopicKinds(["b"], "not_progress");
+        Assert.Equal(new Dictionary<string, string> { ["a"] = "progress", ["b"] = "not_progress" }, t.Store.GetTopicKinds());
+        t.Store.SetTopicKinds(["a"], null);
+        Assert.Equal(["b"], t.Store.GetTopicKinds().Keys);
+        Assert.ThrowsAny<Exception>(() => t.Store.SetTopicKinds(["c"], "maybe")); // only the three kinds are allowed
+    }
+
+    [Fact]
     public void RangeQueryReturnsOverlappingSegmentsOnly()
     {
         using var t = new TempData();
