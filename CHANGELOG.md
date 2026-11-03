@@ -59,6 +59,26 @@ the replay of a race in a racing game.
   - **Not tested:** none of this has been tried on a device. Overland and OwnTracks behaviour would need the same
     kind of real-device test as the Shortcuts integration.
 
+## 0.6.0 — 2026-11-03
+
+- **Phone app tracking without Shortcuts.** *Why:* two Shortcuts automations per app were too much work to set up.
+  The recorder can now act as a DNS server on the PC's Tailscale address. You add it as a Tailscale nameserver
+  next to Cloudflare. Tailscale asks both at once, so the phone keeps working when the PC is off.
+  - Every lookup is forwarded. Lookups for listed apps (YouTube, Instagram, KakaoTalk, TikTok, Netflix, 치지직…;
+    `NetworkApps`) are stored in the new `dns_hits` table (schema v7).
+  - Bursts of lookups become estimated sessions on the 📱 lane: at least 3 lookups, at most 3 min apart, shown
+    faded and hatched and counted as "≈". Apps that also have Shortcuts automations keep their exact sessions.
+  - Setup window: tray → iPhone app tracking → "Track phone apps without Shortcuts (network)…". It has an
+    on/off switch, a firewall button (UDP 53 from 100.64.0.0/10 only), the address to paste with a link to
+    Tailscale's DNS page, and a live status line. Guide: docs/phone-network-tracking.md.
+  - Forwarding asks the PC's own DNS servers plus 8.8.8.8 and 1.1.1.1 at once. *Why:* campus Wi-Fi here blocks
+    1.1.1.1.
+- **Fixed: reading Tailscale's status on Korean Windows.** It was decoded as cp949 instead of UTF-8, so a Korean
+  display name broke the JSON. This also affected the iPhone setup window's URL. iPhones are now named by their
+  Tailscale name, because their HostName is "localhost".
+- Tests: 180.
+- Not yet tested from a real iPhone with the nameserver set.
+
 ## 0.5.1 — 2026-10-31
 
 - **Topics: Progress / Not progress / Unsorted instead of YouTube / Social / Other.** *Why:* "YouTube 3h" said

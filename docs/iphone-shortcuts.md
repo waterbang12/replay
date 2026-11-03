@@ -1,5 +1,8 @@
 # iPhone app tracking with Shortcuts
 
+> **Easier option:** [phone-network-tracking.md](phone-network-tracking.md) needs no Shortcuts at all (one-time
+> setup, estimated times). Use this guide when you want exact open/close times for a few apps.
+
 LifeReplay can log **which iPhone apps you open and close** and show that next to your Windows time. It uses
 Apple's built-in Shortcuts app: a personal automation per app runs when the app opens or closes and sends one small
 event to the recorder on your PC. Nothing is recorded on the phone's screen, and no App Store app is needed.

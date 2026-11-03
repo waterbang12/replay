@@ -70,7 +70,10 @@ internal sealed class TrayApp : ApplicationContext
         _syncEnabledItem = new ToolStripMenuItem("Enable iPhone app tracking", null, async (_, _) => await ToggleSync());
         _syncPairItem = new ToolStripMenuItem("Set up iPhone (new token)...", null, (_, _) => ShowPairing());
         var syncMenu = new ToolStripMenuItem("iPhone app tracking");
-        syncMenu.DropDownItems.AddRange([_syncStatusItem, _syncEnabledItem, _syncPairItem,
+        syncMenu.DropDownItems.AddRange([
+            new ToolStripMenuItem("Track phone apps without Shortcuts (network)...", null, (_, _) => ShowPhoneDns()) { Font = new Font(_menu.Font, FontStyle.Bold) },
+            new ToolStripSeparator(),
+            _syncStatusItem, _syncEnabledItem, _syncPairItem,
             new ToolStripMenuItem("Revoke all paired iPhones", null, (_, _) => RevokePairings())]);
 
         _menu.Items.AddRange([
@@ -223,6 +226,16 @@ internal sealed class TrayApp : ApplicationContext
             dlg.ShowDialog();
         }
         catch (Exception ex) { Log.Error("Pairing failed", ex); MessageBox.Show(ex.Message, "LifeReplay"); }
+    }
+
+    private void ShowPhoneDns()
+    {
+        try
+        {
+            using var dlg = new PhoneDnsDialog(_host);
+            dlg.ShowDialog();
+        }
+        catch (Exception ex) { Log.Error("Phone DNS setup failed", ex); MessageBox.Show(ex.Message, "LifeReplay"); }
     }
 
     private void RevokePairings()

@@ -142,8 +142,13 @@ public partial class MainWindow : Window
         _timeline = DayTimeline.Build(start, end, now, segments, gaps, _store.GetDisplays(), _store.GetDevices());
         _timeline.Focus = _store.GetFocusInRange(start, end);
         // iPhone app sessions: read a margin around the day so sessions crossing midnight pair up correctly.
-        _timeline.PhoneSessions = AppSessions.Reconstruct(_store.GetAppEvents(start - 86_400_000, end + 86_400_000))
+        // Plus sessions estimated from the phone's network lookups, for apps without Shortcuts automations.
+        var shortcutSessions = AppSessions.Reconstruct(_store.GetAppEvents(start - 86_400_000, end + 86_400_000))
             .Where(s => s.EndUtcMs >= start && s.StartUtcMs < end).ToList();
+        var networkSessions = NetworkSessions.Build(_store.GetDnsHits(start - 3_600_000, end + 3_600_000))
+            .Where(s => s.EndUtcMs >= start && s.StartUtcMs < end).ToList();
+        _timeline.PhoneSessions = NetworkSessions.Combine(shortcutSessions, networkSessions);
+        _timeline.PhoneLastNetworkMs = _store.LastDnsHitUtcMs();
         _timeline.PhoneStatus = _store.GetAppEventStatus();
         UpdateSummary();
         _thumbs = _store.GetThumbnails(segments.Select(s => s.Id)).GroupBy(t => t.SegmentId).ToDictionary(g => g.Key, g => g.OrderBy(t => t.TsUtcMs).ToList());

@@ -7,7 +7,10 @@ timeline for looking back at your day.
   Windows.Graphics.Capture and the GPU's hardware encoder. 10 fps, 1080p, about 560 MB per hour per monitor by default.
 - **Viewer** (`LifeReplay.Viewer.exe`): pick a day, see every screen on one timeline, play at 1–16×, scrub with
   thumbnail previews, jump to a time, skip gaps and idle stretches, delete recordings.
-- **iPhone app usage** (no iPhone app needed): Apple Shortcuts automations ("App is opened / closed") send small
+- **Phone app usage without Shortcuts** (easiest): the PC acts as the phone's DNS server over Tailscale and turns
+  each app's server lookups into estimated sessions on the 📱 lane. One-time setup, no per-app work. Setup:
+  [docs/phone-network-tracking.md](docs/phone-network-tracking.md).
+- **iPhone app usage, exact** (no iPhone app needed): Apple Shortcuts automations ("App is opened / closed") send small
   events to the recorder, and the viewer shows an iPhone lane and per-app totals next to your Windows time.
   No screen recording on the iPhone. Setup: [docs/iphone-shortcuts.md](docs/iphone-shortcuts.md).
 
@@ -32,6 +35,8 @@ only through your own Tailscale network) is off until you enable it.
 | iPhone app-usage endpoint (HTTPS, token, validation, dedupe, offline queue format) | ✅ Unit tests + end-to-end with `curl` against the real recorder |
 | iPhone session reconstruction (missing/duplicate/out-of-order events, midnight) | ✅ Unit tested |
 | iPhone lane + "iPhone" summary in the viewer | ✅ Verified with events sent by `curl` (screenshot); hover popup not exercised |
+| Phone DNS tracking: forwarding, storing only listed apps, sessions from lookups | ✅ Unit tests (real UDP forwarder against a fake upstream) + `nslookup` through the installed recorder on the PC's Tailscale address |
+| Phone DNS tracking from a real iPhone (Tailscale nameserver set) | ❌ **Not tested on a device yet** |
 | Shortcuts automations on a real iPhone, Tailscale Serve | ❌ **Not tested on a device** — follow the test procedure in docs/iphone-shortcuts.md |
 
 Full test log with numbers: [docs/testing.md](docs/testing.md). Design: [docs/architecture.md](docs/architecture.md).
@@ -186,6 +191,7 @@ Changes are applied automatically when the file is saved (or via tray → Reload
 | `logWindowTitles` | true | Log which app and window title (tab / document / file) is in front, for the viewer's **Summary** panel and "Apps / tabs" timeline lane. Only while recording; excluded windows appear as "(private)". |
 | `idleMinutes` | 5 | No input and no screen change for this long isn't counted as time on an app. |
 | `sync.enabled` / `sync.port` / `sync.bindAddress` | false / 47800 / 127.0.0.1 | iPhone app-usage endpoint. 127.0.0.1 = only reachable through Tailscale Serve on this PC. |
+| `phoneDns.enabled` / `phoneDns.upstream` | false / auto | DNS server on the PC's Tailscale address for phone app tracking without Shortcuts. `auto` forwards to the PC's DNS servers + 8.8.8.8 + 1.1.1.1 at once; or one IP. |
 
 ## Privacy and security
 

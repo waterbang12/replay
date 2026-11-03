@@ -21,6 +21,8 @@ internal sealed class RecorderHost : IAsyncDisposable
     public PairingStore Pairing { get; }
     public string? SyncError { get; private set; }
     public SyncServer? Sync => _sync;
+    public PhoneDnsLogger? PhoneDns => _dns;
+    public string? PhoneDnsError { get; private set; }
 
     private readonly ExclusionWatcher _exclusions;
     private readonly DisplayPowerWatcher _displayPower;
@@ -29,6 +31,11 @@ internal sealed class RecorderHost : IAsyncDisposable
     private readonly System.Windows.Forms.Timer _configDebounce;
     private readonly bool _persistConfig;
     private SyncServer? _sync;
+    private PhoneDnsLogger? _dns;
+    private System.Threading.Timer? _dnsRetry;
+    private readonly object _dnsGate = new();
+    private TailscaleInfo? _tailscale;
+    private long _tailscaleReadMs;
     private bool _disposed;
 
     public RecorderHost(AppPaths paths, MetadataStore store, string deviceId, RecorderConfig cfg, bool persistConfig = true)
@@ -67,6 +74,7 @@ internal sealed class RecorderHost : IAsyncDisposable
         _exclusions.Check();
         await Controller.StartAsync();
         if (Config.Sync.Enabled) await StartSyncAsync();
+        if (Config.PhoneDns.Enabled) await StartPhoneDnsAsync();
     }
 
     public async Task ReloadConfigAsync()
@@ -76,12 +84,18 @@ internal sealed class RecorderHost : IAsyncDisposable
             var cfg = RecorderConfig.Load(Paths.ConfigPath);
             if (cfg.LoadWarning != null) Log.Warn(cfg.LoadWarning);
             bool syncChanged = cfg.Sync.Enabled != Config.Sync.Enabled || cfg.Sync.Port != Config.Sync.Port;
+            bool dnsChanged = cfg.PhoneDns.Enabled != Config.PhoneDns.Enabled || cfg.PhoneDns.Upstream != Config.PhoneDns.Upstream;
             Config = cfg;
             await Controller.ApplyConfigAsync(cfg);
             if (syncChanged)
             {
                 await StopSyncAsync();
                 if (cfg.Sync.Enabled) await StartSyncAsync();
+            }
+            if (dnsChanged)
+            {
+                await StopPhoneDnsAsync();
+                if (cfg.PhoneDns.Enabled) await StartPhoneDnsAsync();
             }
             _exclusions.Check();
         }
@@ -151,22 +165,113 @@ internal sealed class RecorderHost : IAsyncDisposable
     }
 
     /// <summary>This PC's Tailscale MagicDNS name (e.g. "my-pc.tail1234.ts.net"), if Tailscale is installed and signed in.</summary>
-    public static string? TailscaleName()
+    public static string? TailscaleName() => TailscaleInfo.Read()?.DnsName;
+
+    // ------------------------------------------------------------------ phone DNS (app tracking without Shortcuts)
+
+    public async Task SetPhoneDnsEnabledAsync(bool enabled)
     {
+        Config.PhoneDns.Enabled = enabled;
+        SaveConfig();
+        await StopPhoneDnsAsync();
+        if (enabled) await StartPhoneDnsAsync();
+    }
+
+    /// <summary>This PC's Tailscale IPv4 address (the nameserver address to enter in the Tailscale admin page).</summary>
+    public System.Net.IPAddress? TailscaleIPv4() => Tailscale(force: true)?.SelfIPv4;
+
+    private TailscaleInfo? Tailscale(bool force = false)
+    {
+        lock (_dnsGate)
+        {
+            long now = TimeUtil.NowMs();
+            if (force || _tailscale == null || now - _tailscaleReadMs > 60_000)
+            {
+                _tailscaleReadMs = now;
+                _tailscale = TailscaleInfo.Read() ?? _tailscale;
+            }
+            return _tailscale;
+        }
+    }
+
+    /// <summary>Name of the device a query came from; null for this PC (its own lookups aren't tracked).</summary>
+    private string? DeviceOf(System.Net.IPAddress ip)
+    {
+        var ts = Tailscale();
+        if (ts == null || ip.Equals(ts.SelfIPv4)) return null;
+        if (ts.Peers.TryGetValue(ip, out var name)) return name;
+        ts = Tailscale(force: TimeUtil.NowMs() - _tailscaleReadMs > 10_000); // a new device: re-read, at most every 10 s
+        return ts != null && ts.Peers.TryGetValue(ip, out name) ? name : null;
+    }
+
+    private Task StartPhoneDnsAsync()
+    {
+        if (_dns != null || _disposed) return Task.CompletedTask;
         try
         {
-            var exe = new[] { "tailscale.exe", Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Tailscale", "tailscale.exe") }
-                .FirstOrDefault(p => !Path.IsPathRooted(p) || File.Exists(p)) ?? "tailscale.exe";
-            using var p = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(exe, "status --json")
-            { RedirectStandardOutput = true, UseShellExecute = false, CreateNoWindow = true });
-            if (p == null) return null;
-            var json = p.StandardOutput.ReadToEndAsync();
-            if (!p.WaitForExit(3000) || !json.Wait(1000)) { try { p.Kill(); } catch { } return null; }
-            using var doc = System.Text.Json.JsonDocument.Parse(json.Result);
-            var dns = doc.RootElement.GetProperty("Self").GetProperty("DNSName").GetString()?.TrimEnd('.');
-            return string.IsNullOrEmpty(dns) ? null : dns;
+            var ip = Tailscale(force: true)?.SelfIPv4
+                     ?? throw new InvalidOperationException("Tailscale isn't running or isn't signed in on this PC");
+            _dns = PhoneDnsLogger.Start(Store, ip, Upstreams, DeviceOf);
+            PhoneDnsError = null;
+            _dnsRetry?.Dispose();
+            _dnsRetry = null;
         }
-        catch { return null; }
+        catch (Exception ex)
+        {
+            PhoneDnsError = ex is System.Net.Sockets.SocketException { SocketErrorCode: System.Net.Sockets.SocketError.AddressAlreadyInUse }
+                ? "port 53 on the Tailscale address is already used by another program" : ex.Message;
+            Log.Warn("Phone DNS could not start (retrying every minute): " + PhoneDnsError);
+            // Tailscale may simply not be up yet (e.g. right after boot).
+            _dnsRetry ??= new System.Threading.Timer(_ => SyncContextPost(() => { if (Config.PhoneDns.Enabled && _dns == null) _ = StartPhoneDnsAsync(); }),
+                null, 60_000, 60_000);
+        }
+        return Task.CompletedTask;
+    }
+
+    private IReadOnlyList<System.Net.IPEndPoint> _upstreams = [];
+    private long _upstreamsReadMs;
+
+    /// <summary>Forwarding targets, re-read every 30 s so a laptop that changes networks keeps working.</summary>
+    private IReadOnlyList<System.Net.IPEndPoint> Upstreams()
+    {
+        long now = TimeUtil.NowMs();
+        if (_upstreams.Count > 0 && now - _upstreamsReadMs < 30_000) return _upstreams;
+        var list = new List<System.Net.IPAddress>();
+        if (Config.PhoneDns.Upstream.Equals("auto", StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                foreach (var nic in System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces())
+                {
+                    if (nic.OperationalStatus != System.Net.NetworkInformation.OperationalStatus.Up ||
+                        nic.NetworkInterfaceType == System.Net.NetworkInformation.NetworkInterfaceType.Loopback ||
+                        nic.Description.Contains("Tailscale", StringComparison.OrdinalIgnoreCase)) continue;
+                    foreach (var a in nic.GetIPProperties().DnsAddresses)
+                        if (a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork && !IsTailnet(a) && !list.Contains(a)) list.Add(a);
+                }
+            }
+            catch (Exception ex) { Log.Warn("Phone DNS: couldn't read this PC's DNS servers: " + ex.Message); }
+            foreach (var s in new[] { "8.8.8.8", "1.1.1.1" })
+                if (!list.Contains(System.Net.IPAddress.Parse(s))) list.Add(System.Net.IPAddress.Parse(s));
+        }
+        else list.Add(System.Net.IPAddress.Parse(Config.PhoneDns.Upstream));
+        _upstreams = list.Select(a => new System.Net.IPEndPoint(a, 53)).ToList();
+        _upstreamsReadMs = now;
+        return _upstreams;
+    }
+
+    /// <summary>100.64.0.0/10, Tailscale's address range (100.100.100.100 is its own resolver).</summary>
+    private static bool IsTailnet(System.Net.IPAddress a)
+    {
+        var b = a.GetAddressBytes();
+        return b[0] == 100 && (b[1] & 0xC0) == 64;
+    }
+
+    private async Task StopPhoneDnsAsync()
+    {
+        _dnsRetry?.Dispose();
+        _dnsRetry = null;
+        if (_dns != null) { await _dns.DisposeAsync(); _dns = null; }
     }
 
     // ------------------------------------------------------------------ Windows events
@@ -219,6 +324,7 @@ internal sealed class RecorderHost : IAsyncDisposable
         _configWatcher.Dispose();
         _configDebounce.Dispose();
         await StopSyncAsync();
+        await StopPhoneDnsAsync();
         await Controller.DisposeAsync();
     }
 }

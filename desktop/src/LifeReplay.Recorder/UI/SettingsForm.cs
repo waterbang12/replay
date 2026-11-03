@@ -190,6 +190,7 @@ internal sealed class SettingsForm : Form
                 WeekdaysOnly = _weekdaysOnly.Checked,
             },
             Sync = old.Sync, // managed from the tray's "iPhone app tracking" menu
+            PhoneDns = old.PhoneDns,
         };
         cfg.Normalize();
         return cfg;

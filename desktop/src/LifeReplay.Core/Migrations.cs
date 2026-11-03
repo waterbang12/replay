@@ -208,6 +208,17 @@ public static class Migrations
                 created_utc INTEGER NOT NULL
             );
             """),
+        (7, """
+            -- Phone DNS lookups that belong to a known app (everything else is passed on and never stored).
+            CREATE TABLE dns_hits (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                device_id  TEXT NOT NULL,
+                ts_utc     INTEGER NOT NULL,
+                domain     TEXT NOT NULL,
+                app        TEXT NOT NULL
+            );
+            CREATE INDEX ix_dns_hits_ts ON dns_hits(ts_utc);
+            """),
     ];
 
     public static int LatestVersion => All[^1].Version;

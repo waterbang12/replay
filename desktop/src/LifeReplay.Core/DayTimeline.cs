@@ -64,6 +64,8 @@ public sealed class DayTimeline
     public List<AppSession> PhoneSessions { get; set; } = [];
     /// <summary>Last time an iPhone event arrived / total events, for the sync-status indicator.</summary>
     public (long? LastReceivedUtcMs, long? LastEventUtcMs, int Count) PhoneStatus { get; set; }
+    /// <summary>Last stored phone network lookup (any day), or null if network tracking never saw one.</summary>
+    public long? PhoneLastNetworkMs { get; set; }
 
     /// <summary>The phone session under time t; zero-length (Unknown) sessions match within <paramref name="toleranceMs"/>.</summary>
     public AppSession? PhoneSessionAt(long t, long toleranceMs)

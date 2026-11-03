@@ -39,6 +39,7 @@ public sealed class RecorderConfig
     /// <summary>Optional daily recording hours; outside them the recorder stays in the tray but doesn't record.</summary>
     public RecordingHours Hours { get; set; } = new();
     public SyncSettings Sync { get; set; } = new();
+    public PhoneDnsSettings PhoneDns { get; set; } = new();
 
     [JsonIgnore] public string? LoadWarning { get; private set; }
 
@@ -59,6 +60,11 @@ public sealed class RecorderConfig
         ExcludedProcesses ??= [];
         ExcludedWindowTitles ??= [];
         Sync ??= new SyncSettings();
+        PhoneDns ??= new PhoneDnsSettings();
+        PhoneDns.Upstream = (PhoneDns.Upstream ?? "").Trim();
+        if (PhoneDns.Upstream.Length == 0 || PhoneDns.Upstream == "1.1.1.1" ||
+            !PhoneDns.Upstream.Equals("auto", StringComparison.OrdinalIgnoreCase) && !System.Net.IPAddress.TryParse(PhoneDns.Upstream, out _))
+            PhoneDns.Upstream = "auto";
         Hours ??= new RecordingHours();
         Hours.Normalize();
         Sync.Port = Math.Clamp(Sync.Port, 1024, 65535);
@@ -161,4 +167,18 @@ public sealed class SyncSettings
     /// the supported setup; 0.0.0.0 = all networks (the PC's firewall still applies).
     /// </summary>
     public string BindAddress { get; set; } = "127.0.0.1";
+}
+
+/// <summary>
+/// Phone app tracking without Shortcuts: a DNS server on this PC's Tailscale address. Every lookup is passed on to
+/// <see cref="Upstream"/>; only lookups that belong to a known app (<see cref="NetworkApps"/>) are stored.
+/// </summary>
+public sealed class PhoneDnsSettings
+{
+    public bool Enabled { get; set; } = false;
+    /// <summary>
+    /// Where lookups are forwarded (plain DNS over UDP). "auto": this PC's current DNS servers plus 8.8.8.8 and
+    /// 1.1.1.1, all asked at once (some networks block outside DNS servers). Or one IP address.
+    /// </summary>
+    public string Upstream { get; set; } = "auto";
 }
