@@ -31,6 +31,8 @@ public sealed class PhoneDnsLogger : IAsyncDisposable
     public long Saved => Interlocked.Read(ref _saved);
     public long? LastQueryUtcMs { get; private set; }
     public string? LastDevice { get; private set; }
+    /// <summary>The socket keeps failing (e.g. the Tailscale address went away): the owner should restart it.</summary>
+    public bool Faulted { get; private set; }
     private long _queries, _saved;
 
     private PhoneDnsLogger(MetadataStore store, UdpClient udp, IPEndPoint listening, Func<IReadOnlyList<IPEndPoint>> upstreams, Func<IPAddress, string?> deviceOf)
@@ -64,13 +66,22 @@ public sealed class PhoneDnsLogger : IAsyncDisposable
 
     private async Task LoopAsync()
     {
+        int errors = 0;
         while (!_cts.IsCancellationRequested)
         {
             UdpReceiveResult r;
             try { r = await _udp.ReceiveAsync(_cts.Token); }
             catch (OperationCanceledException) { break; }
             catch (ObjectDisposedException) { break; }
-            catch (SocketException ex) { Log.Warn("Phone DNS: receive failed: " + ex.Message); continue; }
+            catch (SocketException ex)
+            {
+                // Usually the network under Tailscale changed. Don't spin: wait, and after a few failures in a row
+                // stop and let the owner's health check open a new socket.
+                if (++errors >= 5) { Faulted = true; Log.Warn("Phone DNS: socket keeps failing, stopping for a restart: " + ex.Message); break; }
+                try { await Task.Delay(1000, _cts.Token); } catch (OperationCanceledException) { break; }
+                continue;
+            }
+            errors = 0;
             if (!await _inFlight.WaitAsync(0)) continue; // overloaded: drop; the client retries or asks the other server
             _ = Task.Run(async () =>
             {

@@ -2,6 +2,58 @@
 
 Each entry says what changed and why it was needed.
 
+## Look here first if something goes wrong
+
+Plain-language notes on how things work, and what to do when they don't.
+
+### Phone tracking without Shortcuts: how it works
+- **Lookups:** whenever an app on your phone needs a server ("where is youtube.com?"), the phone asks a DNS
+  server. Tailscale sends that question to **two places at once**: your PC (`100.71.238.56`) and Cloudflare.
+  - The first answer is used, so the phone works even when the PC is off.
+  - The PC passes the question on (to the Wi-Fi's DNS, 8.8.8.8 and 1.1.1.1) and writes down the time if the name
+    belongs to a known app (YouTube, Instagram, KakaoTalk…). Everything else is passed on and not saved.
+- **Sessions:** several lookups for the same app close together become one "≈" session on the 📱 row. They're
+  estimates, not exact times.
+- **Times:** they come from the PC's clock when the question arrives. The phone stores nothing, so there is no
+  queue: **time when the PC can't hear the phone is simply missing.**
+
+### Phone tracking and network changes
+
+| What changes | Phone internet | Recording |
+|---|---|---|
+| Phone switches Wi-Fi ↔ LTE/5G | works | Continues after Tailscale reconnects (usually a few seconds). Lookups in those seconds go only to Cloudflare and are missed. |
+| Phone turns Tailscale off, or iOS stops it | works (normal DNS) | **Stops** until Tailscale is on again. Turn on VPN On Demand in the Tailscale app. |
+| PC is off, asleep, or LifeReplay isn't running | works (Cloudflare answers) | **Stops**. Nothing is saved for that time. |
+| PC changes network (home ↔ campus) | works | The PC's Tailscale address stays `100.71.238.56`. The Wi-Fi's DNS servers are re-read every 30 s. A health check restarts the listener if needed: 15 s after wake-up or a network change, and every minute anyway. |
+| Campus/hotel Wi-Fi with a login page | may need a moment | If the login page won't open, turn Tailscale off on the phone, log in, then turn it back on. |
+
+- **Check it's working:** tray → iPhone app tracking → Track phone apps without Shortcuts. The bottom line shows
+  the last request from the phone.
+- **Phone internet broken while Tailscale is on:** in the Tailscale admin DNS page, make sure **Cloudflare** is
+  listed next to the PC address. To undo everything there, remove the PC address and turn off "Override DNS
+  servers".
+- Not yet tested on a real iPhone, and the restart after network changes isn't tested on a real network change.
+
+### The Windows Firewall rule
+- One rule, named **"LifeReplay phone DNS"**. It lets incoming DNS questions (UDP port 53) reach
+  **LifeReplay.exe only**, and only **from Tailscale addresses (100.64.0.0/10)**, which are your own devices. The
+  firewall stays on for everything else.
+- If the setup window says "⚠ 예전 규칙" (old rule): click 방화벽 허용하기 once to replace it with the stricter one.
+- To remove it, open an admin terminal and run `netsh advfirewall firewall delete rule name="LifeReplay phone DNS"`.
+  Or: Windows Defender Firewall → Advanced settings → Inbound Rules → delete "LifeReplay phone DNS".
+
+### Is it real time?
+- **Screen video:** saved in 5-minute files, so the replay can be up to 5 minutes behind. `segmentSeconds` in
+  config.json changes this.
+- **Phone apps:** saved every 10 s, and the viewer refreshes every 30 s, so they appear within about 40 s. A session
+  shows up after 3 lookups; its end time settles a few minutes after you stop.
+
+### Storage
+- **Video** is deleted after 7 days (`retentionDays`). At the current quality that's about 30–40 GB.
+- **Time records** are kept forever (`keepTimeRecordsDays` = 0): which app or window and when, phone apps,
+  pauses. They take a few MB a year. Old days stay in the day list as "time records only".
+- Still too big? Lower `fps` from 10 to 3 in Settings; video is then about a third of the size.
+
 ## Planned (not started): ideas and open issues
 
 ### Reminders away from the PC: phone push or a small desk device

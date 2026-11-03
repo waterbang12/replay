@@ -49,6 +49,7 @@ internal sealed class RecorderHost : IAsyncDisposable
         Pairing = new PairingStore(paths.SyncDir);
 
         SystemEvents.PowerModeChanged += OnPowerModeChanged;
+        System.Net.NetworkInformation.NetworkChange.NetworkAddressChanged += OnNetworkAddressChanged;
         SystemEvents.SessionSwitch += OnSessionSwitch;
         SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
         SystemEvents.SessionEnding += OnSessionEnding;
@@ -213,19 +214,39 @@ internal sealed class RecorderHost : IAsyncDisposable
                      ?? throw new InvalidOperationException("Tailscale isn't running or isn't signed in on this PC");
             _dns = PhoneDnsLogger.Start(Store, ip, Upstreams, DeviceOf);
             PhoneDnsError = null;
-            _dnsRetry?.Dispose();
-            _dnsRetry = null;
         }
         catch (Exception ex)
         {
             PhoneDnsError = ex is System.Net.Sockets.SocketException { SocketErrorCode: System.Net.Sockets.SocketError.AddressAlreadyInUse }
                 ? "port 53 on the Tailscale address is already used by another program" : ex.Message;
             Log.Warn("Phone DNS could not start (retrying every minute): " + PhoneDnsError);
-            // Tailscale may simply not be up yet (e.g. right after boot).
-            _dnsRetry ??= new System.Threading.Timer(_ => SyncContextPost(() => { if (Config.PhoneDns.Enabled && _dns == null) _ = StartPhoneDnsAsync(); }),
-                null, 60_000, 60_000);
         }
+        // Health check every minute while on: Tailscale may not be up yet (right after boot), or the PC slept or
+        // changed networks and the socket stopped working.
+        _dnsRetry ??= new System.Threading.Timer(_ => SyncContextPost(() => _ = CheckPhoneDnsAsync()), null, 60_000, 60_000);
         return Task.CompletedTask;
+    }
+
+    private bool _checking;
+
+    private async Task CheckPhoneDnsAsync()
+    {
+        if (!Config.PhoneDns.Enabled || _disposed || _checking) return;
+        _checking = true;
+        try
+        {
+            if (_dns == null) { await StartPhoneDnsAsync(); return; }
+            var ip = await Task.Run(() => Tailscale(force: true)?.SelfIPv4);
+            string? why = _dns.Faulted ? "socket failed"
+                : ip != null && !ip.Equals(_dns.Listening.Address) ? $"Tailscale address changed to {ip}" : null;
+            if (why == null) return;
+            Log.Info($"Phone DNS: restarting ({why})");
+            await _dns.DisposeAsync();
+            _dns = null;
+            await StartPhoneDnsAsync();
+        }
+        catch (Exception ex) { Log.Error("Phone DNS health check failed", ex); }
+        finally { _checking = false; }
     }
 
     private IReadOnlyList<System.Net.IPEndPoint> _upstreams = [];
@@ -279,8 +300,17 @@ internal sealed class RecorderHost : IAsyncDisposable
     private void OnPowerModeChanged(object? sender, PowerModeChangedEventArgs e)
     {
         if (e.Mode == PowerModes.Suspend) _ = Controller.SetSleepingAsync(true);
-        else if (e.Mode == PowerModes.Resume) _ = Controller.SetSleepingAsync(false);
+        else if (e.Mode == PowerModes.Resume) { _ = Controller.SetSleepingAsync(false); SoonCheckPhoneDns(); }
     }
+
+    /// <summary>After wake-up or a network change, Tailscale needs a few seconds to reconnect; check the DNS listener then.</summary>
+    private void SoonCheckPhoneDns()
+    {
+        if (!Config.PhoneDns.Enabled) return;
+        _ = Task.Delay(15_000).ContinueWith(_ => SyncContextPost(() => _ = CheckPhoneDnsAsync()));
+    }
+
+    private void OnNetworkAddressChanged(object? sender, EventArgs e) => SoonCheckPhoneDns();
 
     private void OnSessionSwitch(object? sender, SessionSwitchEventArgs e)
     {
@@ -315,6 +345,7 @@ internal sealed class RecorderHost : IAsyncDisposable
         if (_disposed) return;
         _disposed = true;
         SystemEvents.PowerModeChanged -= OnPowerModeChanged;
+        System.Net.NetworkInformation.NetworkChange.NetworkAddressChanged -= OnNetworkAddressChanged;
         SystemEvents.SessionSwitch -= OnSessionSwitch;
         SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
         SystemEvents.SessionEnding -= OnSessionEnding;
