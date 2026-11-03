@@ -134,6 +134,42 @@ the replay of a race in a racing game.
   - **Not tested:** none of this has been tried on a device. Overland and OwnTracks behaviour would need the same
     kind of real-device test as the Shortcuts integration.
 
+### Always-on home camera: when you got up (and left the desk)
+*Why:* the day's plan starts when you actually get up, not when the PC first wakes. A camera at home can tell
+"out of bed 07:42" with no phone setup.
+- **Camera:** a plug-in Tapo camera (C100/C200/C210 etc.; battery models usually have no local stream).
+  - In the Tapo app: Settings → Advanced Settings → **Camera Account** (a local-only login).
+  - Give the camera a fixed IP in the router.
+  - Low-resolution stream: `rtsp://USER:PASS@<camera-ip>:554/stream2`. Privacy Mode must be off.
+- **Detection (on the PC, local):**
+  - Read the low stream at about 1 frame per second.
+  - Draw a **bed zone** once on a snapshot.
+  - A small person-detection model (ONNX) runs on each frame; infrared night mode works in the dark.
+  - "Up" = a person outside the bed zone for 2 min or more after being in it, and after a set hour (e.g. 05:00), so
+    short night trips are ignored.
+  - Also possible: "away from desk" with a desk zone.
+- **Stored:** only events (`up 07:42`, `left desk 13:05`) on a new timeline row. **No frames are kept.** The
+  camera login is stored encrypted (DPAPI).
+- **Coach use:** actual start vs planned start; a nudge when you're up but haven't started 30 min later.
+- **Simpler fallback:** the camera's own motion events (ONVIF, port 2020), with no model. Rolling over in bed also
+  triggers them, so expect false wake-ups.
+- **Open issues:**
+  - The PC must be on, or a mini server (Raspberry Pi) must run the detection.
+  - A bedroom camera is sensitive: block the camera's internet access in the router if the Tapo cloud isn't needed.
+  - Model choice and CPU use at 1 fps.
+  - Not tested with a real camera.
+
+### Rename the project to "Yet Another Productivity App"
+- **GitHub repository:** rename it on github.com: the repository → Settings → Repository name. GitHub redirects
+  the old address. Then run `git remote set-url origin <new url>` here. It can't be done from this PC: there's no
+  GitHub CLI or API login, only git push.
+- **Folder and code:** rename the folder (`life_replay`), the solution and projects, the exe names, the tray and
+  window titles, and the data folder `%LOCALAPPDATA%\LifeReplay`.
+  - The data folder needs a careful move: database, recordings, config, iPhone key.
+  - Autostart (HKCU Run), the coach tray's Run entry, mutex names, the firewall rule and the Tailscale Serve
+    target would all need updating.
+  - Not started: it means stopping recording and moving all data, so it needs a planned time.
+
 ## 0.7.2 — 2026-11-03
 
 - **The viewer opens only once.** *Why:* double-clicking the tray icon again opened a second window. A second
