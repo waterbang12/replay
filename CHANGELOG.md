@@ -134,6 +134,14 @@ the replay of a race in a racing game.
   - **Not tested:** none of this has been tried on a device. Overland and OwnTracks behaviour would need the same
     kind of real-device test as the Shortcuts integration.
 
+## 0.7.2 — 2026-11-03
+
+- **The viewer opens only once.** *Why:* double-clicking the tray icon again opened a second window. A second
+  launch for the same data folder now brings the open window to the front (and opens the coach if asked) and quits.
+  It uses a named mutex and two named events.
+- Cleanup: 8 iPhone test events from setting up the automations were deleted (a "closed" automation that also
+  fired on open, Chrome with no close automation, two lone closes). They showed up as "missing events".
+
 ## 0.7.1 — 2026-11-03
 
 - **iPhone events from a file in iCloud Drive.** *Why:* with the URL automations, every open/close made while the

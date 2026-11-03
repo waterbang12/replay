@@ -5,6 +5,10 @@ namespace LifeReplay.Viewer;
 
 public partial class App : Application
 {
+    // One viewer per data folder, like a normal desktop app: opening it again brings the open window to the front.
+    private Mutex? _single;
+    private EventWaitHandle? _activate, _showCoach;
+
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
@@ -20,6 +24,19 @@ public partial class App : Application
         var paths = AppPaths.Resolve(dataDir);
         paths.EnsureCreated();
         Log.Init(paths.LogsDir, "viewer");
+
+        var name = @"Local\LifeReplay.Viewer." + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(paths.DataDir.ToLowerInvariant())))[..16];
+        _single = new Mutex(true, name, out bool first);
+        _activate = new EventWaitHandle(false, EventResetMode.AutoReset, name + ".activate");
+        _showCoach = new EventWaitHandle(false, EventResetMode.AutoReset, name + ".coach");
+        if (!first)
+        {
+            // Already open: ask that window to come to the front (and open the coach if asked), then quit.
+            (e.Args.Contains("--coach") ? _showCoach : _activate).Set();
+            Shutdown(0);
+            return;
+        }
         DispatcherUnhandledException += (_, args) =>
         {
             Log.Error("Unhandled UI exception", args.Exception);
@@ -35,6 +52,7 @@ public partial class App : Application
             MainWindow = window;
             window.Show();
             if (e.Args.Contains("--coach")) window.ShowCoach();
+            ListenForSecondLaunch(window);
         }
         catch (Exception ex)
         {
@@ -42,5 +60,29 @@ public partial class App : Application
             MessageBox.Show("LifeReplay could not open its database:\n" + ex.Message, "LifeReplay", MessageBoxButton.OK, MessageBoxImage.Error);
             Shutdown(1);
         }
+    }
+
+    private void ListenForSecondLaunch(MainWindow window)
+    {
+        var thread = new Thread(() =>
+        {
+            var handles = new WaitHandle[] { _activate!, _showCoach! };
+            while (true)
+            {
+                int which = WaitHandle.WaitAny(handles);
+                Dispatcher.BeginInvoke(() =>
+                {
+                    if (window.WindowState == WindowState.Minimized) window.WindowState = WindowState.Normal;
+                    window.Show();
+                    window.Activate();
+                    // Windows only lets the foreground app take focus; a brief Topmost brings it up reliably.
+                    window.Topmost = true;
+                    window.Topmost = false;
+                    window.Focus();
+                    if (which == 1) window.ShowCoach();
+                });
+            }
+        }) { IsBackground = true, Name = "single-instance" };
+        thread.Start();
     }
 }
