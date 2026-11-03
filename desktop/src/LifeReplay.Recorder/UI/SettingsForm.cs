@@ -78,7 +78,7 @@ internal sealed class SettingsForm : Form
             Row("Timeline preview every (s)", _thumbs),
             _cursor, _border, _hardware));
         tabs.TabPages.Add(Page("Storage",
-            Row("Keep recordings for (days)", _retentionDays), Hint("Older recordings are deleted. 0 = keep forever."),
+            Row("Keep video for (days)", _retentionDays), Hint("Older video is deleted. Which apps/windows you used (and phone records) are kept. 0 = keep forever."),
             Row("Maximum storage (GB)", _maxStorage), Hint("Oldest recordings are deleted above this. 0 = no limit."),
             Row("Pause if free disk below (GB)", _minFree),
             _estimate,
@@ -191,6 +191,7 @@ internal sealed class SettingsForm : Form
             },
             Sync = old.Sync, // managed from the tray's "iPhone app tracking" menu
             PhoneDns = old.PhoneDns,
+            KeepTimeRecordsDays = old.KeepTimeRecordsDays,
         };
         cfg.Normalize();
         return cfg;

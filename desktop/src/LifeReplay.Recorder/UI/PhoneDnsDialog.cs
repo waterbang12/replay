@@ -93,29 +93,45 @@ internal sealed class PhoneDnsDialog : Form
         }
     }
 
-    private static bool FirewallAllowed()
+    /// <summary>The recorder exe the rule is limited to.</summary>
+    private static string ExePath => Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, "LifeReplay.exe");
+
+    /// <summary>null = no rule; false = a rule exists but isn't limited to this program (older version); true = OK.</summary>
+    private static bool? FirewallState()
     {
         try
         {
-            using var p = Process.Start(new ProcessStartInfo("netsh", $"advfirewall firewall show rule name=\"{FirewallRule}\"")
+            using var p = Process.Start(new ProcessStartInfo("netsh", $"advfirewall firewall show rule name=\"{FirewallRule}\" verbose")
             { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true });
-            if (p == null) return false;
-            p.StandardOutput.ReadToEnd();
+            if (p == null) return null;
+            var text = p.StandardOutput.ReadToEnd();
             p.WaitForExit(5000);
-            return p.ExitCode == 0;
+            if (p.ExitCode != 0) return null;
+            return text.Contains(ExePath, StringComparison.OrdinalIgnoreCase);
         }
-        catch { return false; }
+        catch { return null; }
     }
 
-    private static string FirewallText() => FirewallAllowed() ? "✓ 허용됨" : "아직 허용 안 됨";
+    private static string FirewallText() => FirewallState() switch
+    {
+        true => "✓ 허용됨 (LifeReplay만, 내 Tailscale 기기에서만)",
+        false => "⚠ 예전 규칙: 다시 눌러서 LifeReplay 전용으로 바꾸세요",
+        _ => "아직 허용 안 됨",
+    };
 
+    /// <summary>
+    /// One inbound rule: UDP 53, only to LifeReplay.exe, only from Tailscale addresses (100.64.0.0/10). Any older
+    /// rule with the same name is deleted first. Needs one admin prompt.
+    /// </summary>
     private void AllowFirewall()
     {
-        if (FirewallAllowed()) { _firewall.Text = FirewallText(); return; }
+        if (FirewallState() == true) { _firewall.Text = FirewallText(); return; }
         try
         {
-            using var p = Process.Start(new ProcessStartInfo("netsh",
-                $"advfirewall firewall add rule name=\"{FirewallRule}\" dir=in action=allow protocol=UDP localport=53 remoteip=100.64.0.0/10")
+            var add = $"netsh advfirewall firewall add rule name=\"{FirewallRule}\" dir=in action=allow protocol=UDP localport=53 " +
+                      $"remoteip=100.64.0.0/10 program=\"{ExePath}\"";
+            using var p = Process.Start(new ProcessStartInfo("cmd.exe",
+                $"/c netsh advfirewall firewall delete rule name=\"{FirewallRule}\" >nul 2>&1 & {add}")
             { UseShellExecute = true, Verb = "runas", WindowStyle = ProcessWindowStyle.Hidden });
             p?.WaitForExit(15000);
         }

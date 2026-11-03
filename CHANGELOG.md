@@ -59,6 +59,19 @@ the replay of a race in a racing game.
   - **Not tested:** none of this has been tried on a device. Overland and OwnTracks behaviour would need the same
     kind of real-device test as the Shortcuts integration.
 
+## 0.6.1 — 2026-11-03
+
+- **Video and time records are kept separately.** *Why:* a week of video is enough to look back at, but the record
+  of what you did should stay for the coach and summaries. `retentionDays` now deletes only video and thumbnails.
+  The new `keepTimeRecordsDays` (default 0 = forever) covers the window log, iPhone events, phone lookups and
+  gaps. Before, both went after `retentionDays`.
+  - The viewer's day list includes days whose video was deleted ("time records only"). Those days show the apps
+    and phone rows and Summary, and the timeline zooms to them.
+- **Firewall rule tightened.** The phone-DNS rule is now limited to LifeReplay.exe, as well as to UDP 53 from
+  Tailscale addresses. *Why:* the first version allowed any program on UDP 53, and Windows' Internet Connection
+  Sharing also listens there. An older rule is shown as "⚠ 예전 규칙", and clicking the button replaces it.
+- Tests: 181.
+
 ## 0.6.0 — 2026-11-03
 
 - **Phone app tracking without Shortcuts.** *Why:* two Shortcuts automations per app were too much work to set up.

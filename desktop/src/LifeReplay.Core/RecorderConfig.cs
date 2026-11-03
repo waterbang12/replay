@@ -22,7 +22,10 @@ public sealed class RecorderConfig
     public bool RecordOnLaunch { get; set; } = true;
     /// <summary>Ask Windows to relaunch the recorder if it crashes (RegisterApplicationRestart).</summary>
     public bool AutoRestartAfterCrash { get; set; } = true;
+    /// <summary>Video (and thumbnails) older than this is deleted. The time records stay; see <see cref="KeepTimeRecordsDays"/>.</summary>
     public int RetentionDays { get; set; } = 30;
+    /// <summary>App/window, iPhone and gap records older than this are deleted. 0 = keep them forever (small: a few MB a year).</summary>
+    public int KeepTimeRecordsDays { get; set; } = 0;
     public double MaxStorageGB { get; set; } = 100;
     /// <summary>Pause recording if free disk space drops below this.</summary>
     public double MinFreeDiskGB { get; set; } = 5;
@@ -53,6 +56,7 @@ public sealed class RecorderConfig
         if (Quality is not ("low" or "medium" or "high")) Quality = "medium";
         BitrateKbps = Math.Clamp(BitrateKbps, 0, 100_000);
         RetentionDays = Math.Max(0, RetentionDays);
+        KeepTimeRecordsDays = Math.Max(0, KeepTimeRecordsDays);
         MaxStorageGB = Math.Max(0, MaxStorageGB);
         MinFreeDiskGB = Math.Max(0, MinFreeDiskGB);
         ThumbnailIntervalSeconds = Math.Clamp(ThumbnailIntervalSeconds, 5, 600);

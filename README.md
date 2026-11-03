@@ -180,7 +180,8 @@ Changes are applied automatically when the file is saved (or via tray → Reload
 | `hardwareEncoding` | true | GPU H.264 encoder, with automatic software fallback. |
 | `recordOnLaunch` | true | Start recording when the recorder starts. |
 | `autoRestartAfterCrash` | true | Ask Windows to relaunch the recorder after a crash. |
-| `retentionDays` | 30 | Delete recordings older than this (0 = keep). |
+| `retentionDays` | 30 | Delete **video** older than this (0 = keep). The time records stay: which app/window, iPhone and phone-network records, pauses. Days without video still appear in the day list ("time records only") with their timeline rows and Summary. |
+| `keepTimeRecordsDays` | 0 | Delete those time records after this many days (0 = keep forever; they take a few MB a year). |
 | `maxStorageGB` | 100 | Delete oldest recordings above this total (0 = no limit). |
 | `minFreeDiskGB` | 5 | Pause recording if the disk gets this full. |
 | `thumbnailIntervalSeconds` | 30 | Timeline preview frequency. |

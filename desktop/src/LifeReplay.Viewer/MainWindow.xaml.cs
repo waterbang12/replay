@@ -114,11 +114,13 @@ public partial class MainWindow : Window
     {
         var tz = TimeZoneInfo.Local;
         var counts = _store.GetAllSegmentStarts().GroupBy(ms => TimeUtil.LocalDate(ms, tz)).ToDictionary(g => g.Key, g => g.Count());
-        _days = counts.Keys.OrderBy(d => d).ToList();
+        // Days whose video was deleted by retention still have their time records (apps, windows, phone).
+        var recordDays = _store.GetActivityHours().Select(h => TimeUtil.LocalDate(h * 3_600_000 + 1_800_000, tz)).ToHashSet();
+        _days = counts.Keys.Union(recordDays).OrderBy(d => d).ToList();
         _suppressEvents = true;
         DaysCombo.Items.Clear();
         foreach (var d in Enumerable.Reverse(_days))
-            DaysCombo.Items.Add(new ComboBoxItem { Content = $"{d:yyyy-MM-dd ddd}  ·  {counts[d]} segment(s)", Tag = d });
+            DaysCombo.Items.Add(new ComboBoxItem { Content = counts.TryGetValue(d, out var n) ? $"{d:yyyy-MM-dd ddd}  ·  {n} segment(s)" : $"{d:yyyy-MM-dd ddd}  ·  time records only", Tag = d });
         if (_days.Count == 0) DaysCombo.Items.Add(new ComboBoxItem { Content = "No recordings yet", IsEnabled = false });
         _suppressEvents = false;
     }
@@ -157,10 +159,11 @@ public partial class MainWindow : Window
         {
             Timeline.ClearImageCache();
             // Zoom to the part of the day that has recordings (at least 1 hour, with a margin).
-            var all = _timeline.Lanes.SelectMany(l => l.Segments).ToList();
+            var all = _timeline.Lanes.SelectMany(l => l.Segments).Select(s => (s.StartUtcMs, End: s.EffectiveEnd(now))).ToList();
+            if (all.Count == 0) all = _timeline.Focus.Select(f => (f.StartUtcMs, End: f.EndUtcMs)).ToList(); // video deleted: zoom to the records
             if (all.Count > 0)
             {
-                long first = all.Min(s => s.StartUtcMs), last = all.Max(s => s.EffectiveEnd(now));
+                long first = all.Min(s => s.StartUtcMs), last = all.Max(s => s.End);
                 long margin = Math.Max(10 * 60_000, (last - first) / 20);
                 long from = first - margin, to = last + margin;
                 if (to - from < 3_600_000) { long mid = (from + to) / 2; from = mid - 1_800_000; to = mid + 1_800_000; }
@@ -189,9 +192,10 @@ public partial class MainWindow : Window
         }
         Log.Info($"Loaded {day}: {segments.Count} segment(s), {_timeline.Lanes.Count} lane(s), now {TimeUtil.ToLocal(now):HH:mm:ss}, position {TimeUtil.ToLocal(_t):HH:mm:ss}");
         BuildViews();
-        EmptyText.Text = _timeline.Lanes.Count == 0
-            ? $"No recordings on {day:dddd, MMMM d}.\n\nStart the LifeReplay recorder (tray icon) to begin recording, or pick another day."
-            : "";
+        EmptyText.Text = _timeline.Lanes.Count > 0 ? ""
+            : _timeline.Focus.Count > 0 || _timeline.PhoneSessions.Count > 0
+                ? $"No video for {day:dddd, MMMM d}: video is kept for {RecorderConfig.Load(_paths.ConfigPath).RetentionDays} days.\n\nThe time records are kept: see the apps and phone rows on the timeline, and Summary."
+                : $"No recordings on {day:dddd, MMMM d}.\n\nStart the LifeReplay recorder (tray icon) to begin recording, or pick another day.";
         Apply();
     }
 

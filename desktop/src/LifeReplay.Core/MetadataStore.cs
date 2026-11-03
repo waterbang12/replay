@@ -212,6 +212,21 @@ public sealed class MetadataStore
         return list;
     }
 
+    /// <summary>Hours (UTC ms / 3,600,000) with any time record (window log, iPhone events, phone lookups), for the day list.</summary>
+    public List<long> GetActivityHours()
+    {
+        using var c = Open();
+        using var cmd = Cmd(c, """
+            SELECT start_utc / 3600000 FROM focus_events
+            UNION SELECT ts_utc / 3600000 FROM app_events
+            UNION SELECT ts_utc / 3600000 FROM dns_hits
+            """);
+        using var r = cmd.ExecuteReader();
+        var list = new List<long>();
+        while (r.Read()) list.Add(r.GetInt64(0));
+        return list;
+    }
+
     public long GetTotalStorageBytes()
     {
         using var c = Open();

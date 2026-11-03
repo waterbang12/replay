@@ -59,6 +59,25 @@ public class RetentionTests
         Assert.Null(t.Store.GetSegment(old.Id));
         Assert.NotNull(t.Store.GetSegment(keep.Id));
     }
+
+    [Fact]
+    public void OldVideoGoesButTimeRecordsStay()
+    {
+        using var t = new TempData();
+        long now = TimeUtil.NowMs();
+        var old = t.AddSegment("d1", now - 10 * Day, now - 10 * Day + 1000, writeFile: true);
+        t.Store.InsertFocus(new FocusRecord { DeviceId = "d", StartUtcMs = now - 10 * Day, EndUtcMs = now - 10 * Day + 60_000, Process = "Code.exe", Title = "x" });
+        t.Store.InsertDnsHits([new DnsHit("p", now - 10 * Day, "www.youtube.com", "YouTube")]);
+
+        RecordingDeleter.ApplyRetention(t.Store, t.Paths, new RecorderConfig { RetentionDays = 7, MaxStorageGB = 0 }, now);
+        Assert.False(File.Exists(t.Paths.ToFull(old.FilePath)));                 // video deleted after 7 days
+        Assert.Single(t.Store.GetFocusInRange(0, now));                          // which app you used: kept
+        Assert.Single(t.Store.GetDnsHits(0, now));
+        Assert.Contains((now - 10 * Day) / 3_600_000, t.Store.GetActivityHours()); // the day stays in the viewer's list
+
+        RecordingDeleter.ApplyRetention(t.Store, t.Paths, new RecorderConfig { RetentionDays = 7, KeepTimeRecordsDays = 9, MaxStorageGB = 0 }, now);
+        Assert.Empty(t.Store.GetFocusInRange(0, now));                           // only if you also limit the records
+    }
 }
 
 public class RecoveryTests

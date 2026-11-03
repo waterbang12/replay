@@ -28,8 +28,10 @@ iPhone (Tailscale on) ──DNS query──► Tailscale ─┬─► this PC, 1
 
 1. **PC:** tray → **iPhone app tracking** → **Track phone apps without Shortcuts (network)…**
    - Tick **켜기 (on)**.
-   - Click **방화벽 허용하기 (allow in firewall)** and answer **Yes** to the admin prompt. This adds an inbound
-     rule for UDP 53 from Tailscale addresses (100.64.0.0/10) only.
+   - Click **방화벽 허용하기 (allow in firewall)** and answer **Yes** to the admin prompt. This adds one inbound
+     rule, "LifeReplay phone DNS": UDP port 53, only to LifeReplay.exe, only from Tailscale addresses
+     (100.64.0.0/10, i.e. your own devices). To remove it, run this in an admin terminal:
+     `netsh advfirewall firewall delete rule name="LifeReplay phone DNS"`.
 2. **Tailscale admin console** (the window's button opens https://console.tailscale.com/admin/dns):
    - Global nameservers → **Add nameserver → Custom** → the PC address shown in the window (100.x.x.x) → Save.
    - **Add nameserver → Cloudflare**.

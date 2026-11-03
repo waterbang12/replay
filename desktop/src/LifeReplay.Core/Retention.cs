@@ -101,12 +101,15 @@ public static class RecordingDeleter
     {
         var items = store.GetSegmentsWhere("1 = 1").Select(s => new RetentionItem(s.Id, s.StartUtcMs, s.FileSize ?? 0, s.Status));
         var plan = Retention.Plan(items, nowMs, cfg.RetentionDays, (long)(cfg.MaxStorageGB * 1024 * 1024 * 1024));
-        if (cfg.RetentionDays > 0)
+        // Video goes after RetentionDays; the time records (which app/window, phone, pauses) are tiny and stay
+        // until KeepTimeRecordsDays (0 = forever), so old days still have their summaries and coach history.
+        if (cfg.KeepTimeRecordsDays > 0)
         {
-            store.DeleteGapsBefore(nowMs - cfg.RetentionDays * 86_400_000L);
-            store.DeleteFocusBefore(nowMs - cfg.RetentionDays * 86_400_000L);
-            store.DeleteAppEventsBefore(nowMs - cfg.RetentionDays * 86_400_000L);
-            store.DeleteDnsHitsBefore(nowMs - cfg.RetentionDays * 86_400_000L);
+            long cutoff = nowMs - cfg.KeepTimeRecordsDays * 86_400_000L;
+            store.DeleteGapsBefore(cutoff);
+            store.DeleteFocusBefore(cutoff);
+            store.DeleteAppEventsBefore(cutoff);
+            store.DeleteDnsHitsBefore(cutoff);
         }
         if (plan.Count == 0) return new Result(0, 0, 0);
         var r = DeleteSegments(store, paths, plan);
