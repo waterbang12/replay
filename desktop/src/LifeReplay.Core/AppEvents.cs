@@ -129,6 +129,26 @@ public static partial class AppEvents
         };
     }
 
+    /// <summary>
+    /// The one-action Shortcuts setup: the automation only opens a URL with the app and event in it, so the time
+    /// is when the PC receives it (no queue: nothing is recorded while the PC can't be reached).
+    /// </summary>
+    public static AppEvent? FromUrl(string? app, string? ev, long nowMs, out string? error)
+    {
+        error = null;
+        var a = NormalizeApp(app);
+        if (a == null) { error = "app is required (1-80 characters)"; return null; }
+        var t = NormalizeType(ev);
+        if (t == null) { error = "ev must be \"opened\" or \"closed\""; return null; }
+        const string device = "iphone";
+        return new AppEvent
+        {
+            DeviceId = device, Source = "ios_shortcuts_url", App = a, Type = t, TsUtcMs = nowMs,
+            TzOffsetMinutes = (int)TimeZoneInfo.Local.GetUtcOffset(DateTimeOffset.FromUnixTimeMilliseconds(nowMs).UtcDateTime).TotalMinutes,
+            EventId = DerivedId(device, a, t, nowMs), EventIdDerived = true, ReceivedUtcMs = nowMs,
+        };
+    }
+
     public static string DerivedId(string device, string app, string type, long tsUtcMs)
     {
         var key = $"{device}|{app.ToLowerInvariant()}|{type}|{tsUtcMs / 1000}";

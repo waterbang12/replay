@@ -107,4 +107,35 @@ public class SyncServerTests
         using var http = Client(new string('0', 64));
         await Assert.ThrowsAsync<HttpRequestException>(() => http.GetAsync($"https://127.0.0.1:{port}/api/v1/hello"));
     }
+
+    [Fact]
+    public async Task OneLineUrlEventsAndSetupPageNeedTheToken()
+    {
+        using var t = new TempData();
+        using var cert = TestCertificate();
+        var pairing = new PairingStore(t.Paths.SyncDir);
+        var token = pairing.CreateToken("phone");
+        int port = FreePort();
+        await using var server = await SyncServer.StartAsync(port, cert, pairing, t.Store, "test", IPAddress.Loopback);
+        using var http = Client(server.Fingerprint);
+        var b = $"https://127.0.0.1:{port}";
+        var k = Uri.EscapeDataString(token);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await http.GetAsync($"{b}/api/v1/e?app=YouTube&ev=opened")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await http.GetAsync($"{b}/api/v1/e?app=YouTube&ev=opened&k=wrong")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await http.GetAsync($"{b}/api/v1/hello?k={k}")).StatusCode); // ?k= only on the two GET routes
+
+        var ok = await http.GetAsync($"{b}/api/v1/e?app={Uri.EscapeDataString("치지직")}&ev=opened&k={k}");
+        Assert.Equal(HttpStatusCode.OK, ok.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await http.GetAsync($"{b}/api/v1/e?app=YouTube&ev=maybe&k={k}")).StatusCode);
+        var e = Assert.Single(t.Store.GetAppEvents(0, long.MaxValue));
+        Assert.Equal(("치지직", "opened", "ios_shortcuts_url"), (e.App, e.Type, e.Source));
+        Assert.True(Math.Abs(e.TsUtcMs - TimeUtil.NowMs()) < 10_000); // time = when the PC received it
+
+        var page = await http.GetAsync($"{b}/setup?k={k}");
+        Assert.Equal(HttpStatusCode.OK, page.StatusCode);
+        var html = await page.Content.ReadAsStringAsync();
+        Assert.Contains("/api/v1/e?app=", html);
+        Assert.DoesNotContain(token, html); // the page reads the key from its own address; the server never writes it in
+    }
 }

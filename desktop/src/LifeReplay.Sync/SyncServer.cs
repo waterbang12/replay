@@ -60,6 +60,10 @@ public sealed class SyncServer : IAsyncDisposable
             }
             var auth = ctx.Request.Headers.Authorization.ToString();
             var token = auth.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase) ? auth[7..].Trim() : null;
+            // The one-action Shortcuts setup can't set headers easily, so these two GET routes also take ?k=<token>.
+            // (Over HTTPS inside your tailnet; the query string is never logged.)
+            if (token == null && HttpMethods.IsGet(ctx.Request.Method) && ctx.Request.Path.Value is "/api/v1/e" or "/setup")
+                token = ctx.Request.Query["k"].ToString() is { Length: > 0 } k ? k : null;
             if (!pairing.Validate(token))
             {
                 failures.AddOrUpdate(ip, _ => (1, now), (_, old) => now - old.WindowStart > 600_000 ? (1, now) : (old.Count + 1, old.WindowStart));
@@ -72,6 +76,20 @@ public sealed class SyncServer : IAsyncDisposable
         });
 
         app.MapGet("/api/v1/hello", () => Results.Json(new { server = serverName, apiVersion = ApiVersion }));
+
+        // One-action Shortcuts: GET /api/v1/e?app=YouTube&ev=opened&k=<token>. Time = when it arrives.
+        app.MapGet("/api/v1/e", (HttpContext ctx) =>
+        {
+            long now = TimeUtil.NowMs();
+            var e = AppEvents.FromUrl(ctx.Request.Query["app"], ctx.Request.Query["ev"], now, out var error);
+            if (e == null) return Results.Text(error!, statusCode: 400);
+            int added = store.InsertAppEvents([e]);
+            Log.Info($"Sync: {e.App} {e.Type} from {ctx.Connection.RemoteIpAddress}{(added == 0 ? " (duplicate)" : "")}");
+            return Results.Text("ok");
+        });
+
+        // Setup page for the phone (opened from the QR code): one "copy" button per app and event.
+        app.MapGet("/setup", () => Results.Content(SetupPage.Html, "text/html; charset=utf-8"));
 
         // One event (JSON object), several (JSON array), or the Shortcuts queue file (one JSON object per line).
         app.MapPost("/api/v1/app-events", async (HttpContext ctx) =>

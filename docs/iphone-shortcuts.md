@@ -3,6 +3,21 @@
 > **Easier option:** [phone-network-tracking.md](phone-network-tracking.md) needs no Shortcuts at all (one-time
 > setup, estimated times). Use this guide when you want exact open/close times for a few apps.
 
+## Quick setup: one action per automation (recommended)
+
+1. PC: tray → **iPhone app tracking** → **Set up iPhone (new token)…** shows a QR code.
+2. iPhone (Tailscale on): scan it with the Camera app. Safari opens the setup page (Korean) at
+   `https://<pc>.<tailnet>.ts.net/setup?k=<token>`. It shows "✓ PC와 연결됨" when it can reach the PC.
+3. For each app, tap **열림 복사** (opened). In Shortcuts: Automation → + → App → pick the app → **Is Opened**
+   only → **Run Immediately** → New Blank Automation → add **Get Contents of URL** → tap "URL" → paste. Repeat
+   with **닫힘 복사** (closed) and **Is Closed**.
+
+Each automation only opens `GET /api/v1/e?app=<name>&ev=opened|closed&k=<token>`. The time is when the PC receives
+it. There is **no offline queue**: events made while the PC or Tailscale is unreachable are lost. When you need
+those too, use the full recipe below (shared shortcut with a queue file).
+
+## Full setup (with an offline queue)
+
 LifeReplay can log **which iPhone apps you open and close** and show that next to your Windows time. It uses
 Apple's built-in Shortcuts app: a personal automation per app runs when the app opens or closes and sends one small
 event to the recorder on your PC. Nothing is recorded on the phone's screen, and no App Store app is needed.

@@ -8,7 +8,7 @@ Plain-language notes on how things work, and what to do when they don't.
 
 ### Phone tracking without Shortcuts: how it works
 - **Lookups:** whenever an app on your phone needs a server ("where is youtube.com?"), the phone asks a DNS
-  server. Tailscale sends that question to **two places at once**: your PC (`100.71.238.56`) and Cloudflare.
+  server. Tailscale sends that question to **two places at once**: your PC (its Tailscale address, 100.x.x.x) and Cloudflare.
   - The first answer is used, so the phone works even when the PC is off.
   - The PC passes the question on (to the Wi-Fi's DNS, 8.8.8.8 and 1.1.1.1) and writes down the time if the name
     belongs to a known app (YouTube, Instagram, KakaoTalk…). Everything else is passed on and not saved.
@@ -24,7 +24,7 @@ Plain-language notes on how things work, and what to do when they don't.
 | Phone switches Wi-Fi ↔ LTE/5G | works | Continues after Tailscale reconnects (usually a few seconds). Lookups in those seconds go only to Cloudflare and are missed. |
 | Phone turns Tailscale off, or iOS stops it | works (normal DNS) | **Stops** until Tailscale is on again. Turn on VPN On Demand in the Tailscale app. |
 | PC is off, asleep, or LifeReplay isn't running | works (Cloudflare answers) | **Stops**. Nothing is saved for that time. |
-| PC changes network (home ↔ campus) | works | The PC's Tailscale address stays `100.71.238.56`. The Wi-Fi's DNS servers are re-read every 30 s. A health check restarts the listener if needed: 15 s after wake-up or a network change, and every minute anyway. |
+| PC changes network (home ↔ campus) | works | The PC's Tailscale address (100.x.x.x) stays the same. The Wi-Fi's DNS servers are re-read every 30 s. A health check restarts the listener if needed: 15 s after wake-up or a network change, and every minute anyway. |
 | Campus/hotel Wi-Fi with a login page | may need a moment | If the login page won't open, turn Tailscale off on the phone, log in, then turn it back on. |
 
 - **Check it's working:** tray → iPhone app tracking → Track phone apps without Shortcuts. The bottom line shows
@@ -33,6 +33,14 @@ Plain-language notes on how things work, and what to do when they don't.
   listed next to the PC address. To undo everything there, remove the PC address and turn off "Override DNS
   servers".
 - Not yet tested on a real iPhone, and the restart after network changes isn't tested on a real network change.
+
+### Shortcuts (one address per automation)
+- Each automation opens one address. The PC records the time **when it arrives**. If the PC is off or Tailscale is
+  off on the phone, that open/close is lost and the viewer shows the session as "inferred" or "unknown".
+- Setup page again: tray → iPhone app tracking → Set up iPhone (new token)… → scan the QR. A new QR makes a new
+  key, and the automations you already made keep working (old keys stay valid until "Revoke all paired iPhones").
+- After "Revoke all paired iPhones", every automation's address stops working, so you'd paste new addresses.
+- "Is Closed" may not fire when you lock the phone. That's an iOS limit; the session then ends when the next app opens.
 
 ### The Windows Firewall rule
 - One rule, named **"LifeReplay phone DNS"**. It lets incoming DNS questions (UDP port 53) reach
@@ -110,6 +118,21 @@ the replay of a race in a racing game.
   - **Time alignment:** phone and PC clocks; the existing clock-skew handling would apply.
   - **Not tested:** none of this has been tried on a device. Overland and OwnTracks behaviour would need the same
     kind of real-device test as the Shortcuts integration.
+
+## 0.6.2 — 2026-11-03
+
+- **Shortcuts with one action per automation.** *Why:* the shared 9-action shortcut, with variables and JSON, was
+  too hard to build by hand.
+  - New route `GET /api/v1/e?app=…&ev=opened|closed&k=<token>`. The time is when the PC receives the request,
+    and there's no queue.
+  - New phone setup page `/setup?k=<token>`, in Korean, with one "copy" button per app and event, step-by-step
+    instructions, and a connection check.
+  - The pairing window's QR code now opens that page (window text in Korean).
+  - The token in the query string is accepted only on those two GET routes, and query strings are never logged.
+- Setup on the PC: iPhone event receiving on (`sync.enabled`, 127.0.0.1:47800), plus
+  `tailscale serve --bg https+insecure://127.0.0.1:47800`. Checked from the PC through the ts.net address: valid
+  certificate, and 401 without a key.
+- Tests: 182. Not yet tested on the iPhone.
 
 ## 0.6.1 — 2026-11-03
 
