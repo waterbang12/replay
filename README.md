@@ -181,6 +181,7 @@ Changes are applied automatically when the file is saved (or via tray → Reload
 | `recordOnLaunch` | true | Start recording when the recorder starts. |
 | `autoRestartAfterCrash` | true | Ask Windows to relaunch the recorder after a crash. |
 | `retentionDays` | 30 | Delete **video** older than this (0 = keep). The time records stay: which app/window, iPhone and phone-network records, pauses. Days without video still appear in the day list ("time records only") with their timeline rows and Summary. |
+| `aiWait.enabled` / `aiWait.idleSeconds` | true / 20 | Log time **waiting on AI tools** as "Waiting on AI" (not progress): no keyboard/mouse input for this long while an AI chat (ChatGPT, Claude, Gemini…, app or browser tab) is in front, or while Claude Code is working and an editor/terminal is in front. It's cut out of the window log, so Apps, Topics, Plan and the coach all see it. |
 | `keepTimeRecordsDays` | 0 | Delete those time records after this many days (0 = keep forever; they take a few MB a year). |
 | `maxStorageGB` | 100 | Delete oldest recordings above this total (0 = no limit). |
 | `minFreeDiskGB` | 5 | Pause recording if the disk gets this full. |

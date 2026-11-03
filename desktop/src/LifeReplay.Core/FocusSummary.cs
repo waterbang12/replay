@@ -13,7 +13,7 @@ public static class FocusSummary
         ["explorer.exe"] = "File Explorer", ["notepad.exe"] = "Notepad", ["Acrobat.exe"] = "Adobe Acrobat",
         ["AcroRd32.exe"] = "Adobe Reader", ["SumatraPDF.exe"] = "SumatraPDF", ["WINWORD.EXE"] = "Word", ["EXCEL.EXE"] = "Excel",
         ["POWERPNT.EXE"] = "PowerPoint", ["Discord.exe"] = "Discord", ["KakaoTalk.exe"] = "KakaoTalk", ["ChatGPT.exe"] = "ChatGPT",
-        ["Notion.exe"] = "Notion", ["Obsidian.exe"] = "Obsidian", ["steam.exe"] = "Steam", ["claude.exe"] = "Claude",
+        ["Notion.exe"] = "Notion", ["Obsidian.exe"] = "Obsidian", ["steam.exe"] = "Steam", ["claude.exe"] = "Claude", [AiTools.WaitProcess] = "Waiting on AI",
     };
 
     /// <summary>Suffixes apps append to every title; removing them leaves the tab / document name.</summary>

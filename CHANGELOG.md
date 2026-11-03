@@ -42,6 +42,13 @@ Plain-language notes on how things work, and what to do when they don't.
 - After "Revoke all paired iPhones", every automation's address stops working, so you'd paste new addresses.
 - "Is Closed" may not fire when you lock the phone. That's an iOS limit; the session then ends when the next app opens.
 
+### "Waiting on AI"
+- 20 s without keyboard or mouse input while an AI chat is in front, or while Claude Code works with VS Code or a
+  terminal in front, counts as "Waiting on AI". That's **not progress**.
+- Reading a long AI answer without scrolling also counts. Scrolling or typing ends the wait.
+- Change the 20 s with `aiWait.idleSeconds` in config.json, or turn it off with `aiWait.enabled: false`.
+- Codex CLI and other agents aren't detected yet. Only their chat windows are.
+
 ### The Windows Firewall rule
 - One rule, named **"LifeReplay phone DNS"**. It lets incoming DNS questions (UDP port 53) reach
   **LifeReplay.exe only**, and only **from Tailscale addresses (100.64.0.0/10)**, which are your own devices. The
@@ -118,6 +125,25 @@ the replay of a race in a racing game.
   - **Time alignment:** phone and PC clocks; the existing clock-skew handling would apply.
   - **Not tested:** none of this has been tried on a device. Overland and OwnTracks behaviour would need the same
     kind of real-device test as the Shortcuts integration.
+
+## 0.7.0 — 2026-11-03
+
+- **"Waiting on AI" counts as not progress.** *Why:* time spent watching an AI tool work looked like time in
+  VS Code or on a task.
+  - With no keyboard or mouse input for 20 s (`aiWait.idleSeconds`), a wait is logged in the new `ai_waits` table
+    (schema v8) when either:
+    - an AI chat is in front: the ChatGPT or Claude app, or a browser tab titled ChatGPT, Claude, Gemini,
+      Perplexity, Copilot, DeepSeek, Grok…; or
+    - Claude Code is working and an editor or terminal is in front.
+  - A wait starts at your last input and ends when you type or move the mouse, or when Claude Code finishes.
+  - "Claude Code is working" comes from the end of its transcript in `%USERPROFILE%\.claude\projects`. The last
+    message is a prompt, tool call or tool result while it works, and an assistant message with
+    `stop_reason: end_turn` when it's done. Only `type` and `stop_reason` are read and nothing is stored. After
+    3 min without a write, it counts as finished.
+  - Waits are cut into the window log as the app "Waiting on AI" (`GetActivityInRange`), which the viewer and the
+    coach use. Apps, Topics (Not progress), Plan matching and the coach's drift time all count it, and nothing is
+    counted twice.
+- Tests: 191. Checked live: a "Claude Code" wait was logged and kept growing while Claude Code was working.
 
 ## 0.6.2 — 2026-11-03
 

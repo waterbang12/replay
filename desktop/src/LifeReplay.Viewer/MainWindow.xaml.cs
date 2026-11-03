@@ -142,7 +142,7 @@ public partial class MainWindow : Window
         var segments = _store.GetSegmentsInRange(start, end);
         var gaps = _store.GetGapsInRange(start, end);
         _timeline = DayTimeline.Build(start, end, now, segments, gaps, _store.GetDisplays(), _store.GetDevices());
-        _timeline.Focus = _store.GetFocusInRange(start, end);
+        _timeline.Focus = _store.GetActivityInRange(start, end);
         // iPhone app sessions: read a margin around the day so sessions crossing midnight pair up correctly.
         // Plus sessions estimated from the phone's network lookups, for apps without Shortcuts automations.
         var shortcutSessions = AppSessions.Reconstruct(_store.GetAppEvents(start - 86_400_000, end + 86_400_000))

@@ -55,6 +55,7 @@ public static class ProgressKinds
     public static string Rule(TitleItem item)
     {
         var t = item.Item;
+        if (item.App == "Waiting on AI") return NotProgress; // idle while an AI tool works (AiTools)
         if (GameApps.Contains(item.App)) return NotProgress;
         if (FixedCategories.Of(item) == FixedCategories.Social) return NotProgress;
         bool learning = ProgressWords.Any(w => t.Contains(w, StringComparison.OrdinalIgnoreCase));

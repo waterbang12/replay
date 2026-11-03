@@ -247,7 +247,7 @@ public static class CoachDay
         var markdown = File.ReadAllText(todo);
         var plan = TodoPlan.Parse(markdown, day);
         var (dayStart, dayEnd) = TimeUtil.LocalDayRange(day);
-        var focus = store.GetFocusInRange(dayStart, dayEnd);
+        var focus = store.GetActivityInRange(dayStart, dayEnd);
         var (defStart, defEnd) = DefaultHours(paths);
         var status = matcher != null ? matcher(plan, focus, dayStart, dayEnd)
             : CachedPlanMatcher.Match(store, plan, focus, dayStart, dayEnd, nowMs, defStart, defEnd);
@@ -271,7 +271,7 @@ public static class CoachDay
     /// <summary>Focus ms per task id in [from, to), for outcome measurement.</summary>
     public static IReadOnlyDictionary<string, long> FocusByTask(MetadataStore store, AppPaths paths, TodoPlan plan, long fromMs, long toMs, long nowMs)
     {
-        var focus = store.GetFocusInRange(fromMs, toMs);
+        var focus = store.GetActivityInRange(fromMs, toMs);
         var (s, e) = DefaultHours(paths);
         var status = CachedPlanMatcher.Match(store, plan, focus, fromMs, toMs, nowMs, s, e);
         return status.Tasks.Select((t, i) => (Id: ScheduleEvaluator.TaskId(i), t.SpentMs)).ToDictionary(x => x.Id, x => x.SpentMs);

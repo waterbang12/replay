@@ -219,6 +219,16 @@ public static class Migrations
             );
             CREATE INDEX ix_dns_hits_ts ON dns_hits(ts_utc);
             """),
+        (8, """
+            -- Time spent waiting on AI tools (no input while an AI chat was in front or Claude Code was working).
+            CREATE TABLE ai_waits (
+                id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                start_utc INTEGER NOT NULL,
+                end_utc   INTEGER NOT NULL,
+                tool      TEXT NOT NULL
+            );
+            CREATE INDEX ix_ai_waits_start ON ai_waits(start_utc);
+            """),
     ];
 
     public static int LatestVersion => All[^1].Version;

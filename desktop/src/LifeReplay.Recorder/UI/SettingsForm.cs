@@ -192,6 +192,7 @@ internal sealed class SettingsForm : Form
             Sync = old.Sync, // managed from the tray's "iPhone app tracking" menu
             PhoneDns = old.PhoneDns,
             KeepTimeRecordsDays = old.KeepTimeRecordsDays,
+            AiWait = old.AiWait,
         };
         cfg.Normalize();
         return cfg;

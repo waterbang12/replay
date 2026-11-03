@@ -110,6 +110,7 @@ public static class RecordingDeleter
             store.DeleteFocusBefore(cutoff);
             store.DeleteAppEventsBefore(cutoff);
             store.DeleteDnsHitsBefore(cutoff);
+            store.DeleteAiWaitsBefore(cutoff);
         }
         if (plan.Count == 0) return new Result(0, 0, 0);
         var r = DeleteSegments(store, paths, plan);

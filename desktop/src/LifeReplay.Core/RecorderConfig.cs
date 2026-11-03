@@ -43,6 +43,7 @@ public sealed class RecorderConfig
     public RecordingHours Hours { get; set; } = new();
     public SyncSettings Sync { get; set; } = new();
     public PhoneDnsSettings PhoneDns { get; set; } = new();
+    public AiWaitSettings AiWait { get; set; } = new();
 
     [JsonIgnore] public string? LoadWarning { get; private set; }
 
@@ -65,6 +66,8 @@ public sealed class RecorderConfig
         ExcludedWindowTitles ??= [];
         Sync ??= new SyncSettings();
         PhoneDns ??= new PhoneDnsSettings();
+        AiWait ??= new AiWaitSettings();
+        AiWait.IdleSeconds = Math.Clamp(AiWait.IdleSeconds, 5, 600);
         PhoneDns.Upstream = (PhoneDns.Upstream ?? "").Trim();
         if (PhoneDns.Upstream.Length == 0 || PhoneDns.Upstream == "1.1.1.1" ||
             !PhoneDns.Upstream.Equals("auto", StringComparison.OrdinalIgnoreCase) && !System.Net.IPAddress.TryParse(PhoneDns.Upstream, out _))
@@ -185,4 +188,12 @@ public sealed class PhoneDnsSettings
     /// 1.1.1.1, all asked at once (some networks block outside DNS servers). Or one IP address.
     /// </summary>
     public string Upstream { get; set; } = "auto";
+}
+
+/// <summary>Logs time waiting on AI tools as "Waiting on AI" (not progress). See <see cref="AiTools"/>.</summary>
+public sealed class AiWaitSettings
+{
+    public bool Enabled { get; set; } = true;
+    /// <summary>No keyboard/mouse input for this long (while an AI tool is in front or working) starts a wait.</summary>
+    public int IdleSeconds { get; set; } = 20;
 }
