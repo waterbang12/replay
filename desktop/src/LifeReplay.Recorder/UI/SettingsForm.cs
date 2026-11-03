@@ -193,6 +193,7 @@ internal sealed class SettingsForm : Form
             PhoneDns = old.PhoneDns,
             KeepTimeRecordsDays = old.KeepTimeRecordsDays,
             AiWait = old.AiWait,
+            ICloudLog = old.ICloudLog,
         };
         cfg.Normalize();
         return cfg;

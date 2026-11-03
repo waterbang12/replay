@@ -34,6 +34,14 @@ Plain-language notes on how things work, and what to do when they don't.
   servers".
 - Not yet tested on a real iPhone, and the restart after network changes isn't tested on a real network change.
 
+### iPhone via iCloud file (current setup)
+- Each automation adds one line to `LifeReplay.txt` in iCloud Drive (Shortcuts folder). The PC reads it every 30 s.
+- **Nothing is lost when the PC is off.** The lines wait in iCloud and are read when the PC is on again.
+- **Delay:** iCloud sync usually takes a few minutes, sometimes longer on battery saver.
+- **Check:** tray → iPhone app tracking → top line "iCloud log: read HH:mm". "⚠ … not understood" names the first
+  line it couldn't read. Usually the date format: tap the Current Date variable → ISO 8601.
+- If nothing arrives, check that iCloud Drive is on, on both the iPhone and the PC.
+
 ### Shortcuts (one address per automation)
 - Each automation opens one address. The PC records the time **when it arrives**. If the PC is off or Tailscale is
   off on the phone, that open/close is lost and the viewer shows the session as "inferred" or "unknown".
@@ -125,6 +133,19 @@ the replay of a race in a racing game.
   - **Time alignment:** phone and PC clocks; the existing clock-skew handling would apply.
   - **Not tested:** none of this has been tried on a device. Overland and OwnTracks behaviour would need the same
     kind of real-device test as the Shortcuts integration.
+
+## 0.7.1 — 2026-11-03
+
+- **iPhone events from a file in iCloud Drive.** *Why:* with the URL automations, every open/close made while the
+  PC was off or Tailscale was down was lost.
+  - The automations now append a line such as `YouTube opened 2026-11-03T16:21:50+09:00` to `LifeReplay.txt` in
+    the Shortcuts iCloud folder. The recorder reads it every 30 s; on the PC the folder is
+    `iCloudDrive\iCloud~is~workflow~my~workflows`.
+  - Times come from the phone. Ids come from app + event + second, so reading the file again is harmless. ISO 8601,
+    the phone's Korean date format, and "열림/닫힘" are all understood.
+  - The tray shows "iCloud log: read HH:mm" or the first line it didn't understand.
+- **Phone DNS recording turned off** and its 843 rows deleted (Shortcuts replaces it). The code stays, switched off.
+- Tests: 193.
 
 ## 0.7.0 — 2026-11-03
 

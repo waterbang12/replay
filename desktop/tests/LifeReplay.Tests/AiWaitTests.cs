@@ -69,3 +69,35 @@ public class AiWaitTests
         Assert.Empty(t.Store.GetAiWaits(0, 100_000));
     }
 }
+
+public class ICloudLogTests
+{
+    [Fact]
+    public void ReadsTheShortcutsLogLines()
+    {
+        long now = DateTimeOffset.Parse("2026-11-03T17:00:00+09:00").ToUnixTimeMilliseconds();
+        var text = "﻿YouTube opened 2026-11-03T16:21:50+09:00\r\n" +
+                   "YouTube closed 2026-11-03T16:25:10+09:00\n" +
+                   "Naver Webtoon 열림 2026-11-03T16:30:00+09:00\n" +
+                   "\n" +
+                   "KakaoTalk opened 2026. 11. 3. 오후 4:40:05\n" +   // the phone's own Korean date format
+                   "hello\n";
+        var errors = new List<string>();
+        var events = AppEvents.ParseLog(text, now, errors);
+        Assert.Equal([("YouTube", "opened"), ("YouTube", "closed"), ("Naver Webtoon", "opened"), ("KakaoTalk", "opened")],
+            events.Select(e => (e.App, e.Type)));
+        Assert.Equal(DateTimeOffset.Parse("2026-11-03T16:21:50+09:00").ToUnixTimeMilliseconds(), events[0].TsUtcMs);
+        Assert.Equal(new DateTimeOffset(2026, 11, 3, 16, 40, 5, TimeZoneInfo.Local.GetUtcOffset(new DateTime(2026, 11, 3))).ToUnixTimeMilliseconds(), events[3].TsUtcMs);
+        Assert.Single(errors); // "hello"
+    }
+
+    [Fact]
+    public void ReadingTheFileAgainAddsNothing()
+    {
+        using var t = new TempData();
+        long now = TimeUtil.NowMs();
+        var line = $"YouTube opened {DateTimeOffset.Now.AddMinutes(-5):yyyy-MM-ddTHH:mm:sszzz}\n";
+        Assert.Equal(1, t.Store.InsertAppEvents(AppEvents.ParseLog(line, now, [])));
+        Assert.Equal(0, t.Store.InsertAppEvents(AppEvents.ParseLog(line + line, now, [])));
+    }
+}

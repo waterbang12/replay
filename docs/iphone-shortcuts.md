@@ -3,7 +3,22 @@
 > **Easier option:** [phone-network-tracking.md](phone-network-tracking.md) needs no Shortcuts at all (one-time
 > setup, estimated times). Use this guide when you want exact open/close times for a few apps.
 
-## Quick setup: one action per automation (recommended)
+## Most reliable: append to a file in iCloud Drive
+
+No server, Tailscale or network needed when the event happens. The phone writes the time itself.
+1. iPhone: Settings → your name → iCloud → iCloud Drive on. PC: the iCloud app → iCloud Drive on (it appears as
+   `%USERPROFILE%\iCloudDrive`; the Shortcuts folder is `iCloud~is~workflow~my~workflows`).
+2. Each automation has one action, **Append to Text File** (텍스트 파일에 추가):
+   - text `YouTube opened ` followed by the **Current Date** variable (tap it → Date Format **ISO 8601**,
+     Include Time on);
+   - file `LifeReplay.txt`, in the Shortcuts folder, with **Make New Line** on.
+3. LifeReplay checks `LifeReplay*.txt` there every 30 s (`iCloudLog` in config.json). Lines look like
+   `YouTube opened 2026-11-03T16:21:50+09:00`. "열림/닫힘" and the phone's Korean date format work too.
+   Reading the file again only finds duplicates.
+
+Delay: iCloud usually syncs within a few minutes. Tray → iPhone app tracking shows "iCloud log: read HH:mm".
+
+## Quick setup: one action per automation (needs the PC and Tailscale at the moment of the event)
 
 1. PC: tray → **iPhone app tracking** → **Set up iPhone (new token)…** shows a QR code.
 2. iPhone (Tailscale on): scan it with the Camera app. Safari opens the setup page (Korean) at

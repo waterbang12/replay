@@ -149,6 +149,54 @@ public static partial class AppEvents
         };
     }
 
+    [GeneratedRegex(@"^\s*(?<app>.+?)\s+(?<ev>opened|closed|open|close|열림|닫힘)\s+(?<ts>\S.*?)\s*$", RegexOptions.IgnoreCase)]
+    private static partial Regex LogLine();
+
+    /// <summary>
+    /// The iCloud log the Shortcuts automations append to, one line per event: "YouTube opened 2026-11-03T16:21:50+09:00".
+    /// The date may also be the phone's localized format ("2026. 11. 3. 오후 4:21:50"), read as this PC's local time.
+    /// Ids are derived from app, event and second, so reading the whole file again only finds duplicates.
+    /// </summary>
+    public static List<AppEvent> ParseLog(string text, long nowMs, List<string> errors)
+    {
+        const string device = "iphone";
+        var list = new List<AppEvent>();
+        int n = 0;
+        foreach (var raw in text.Split('\n'))
+        {
+            n++;
+            var line = raw.Trim().TrimStart('﻿');
+            if (line.Length == 0) continue;
+            var m = LogLine().Match(line);
+            if (!m.Success) { errors.Add($"line {n}: expected \"<app> opened|closed <date>\""); continue; }
+            var app = NormalizeApp(m.Groups["app"].Value);
+            var type = NormalizeType(m.Groups["ev"].Value);
+            if (app == null || type == null) { errors.Add($"line {n}: app name must be 1-80 characters"); continue; }
+            if (!TryParseLogTime(m.Groups["ts"].Value, out var ts, out var offset)) { errors.Add($"line {n}: can't read the date \"{m.Groups["ts"].Value}\""); continue; }
+            if (ts > nowMs + MaxFutureMs || ts < nowMs - MaxAgeMs) continue; // wrong clock or very old: skip quietly
+            list.Add(new AppEvent
+            {
+                DeviceId = device, Source = "ios_icloud_log", App = app, Type = type, TsUtcMs = ts, TzOffsetMinutes = offset,
+                EventId = DerivedId(device, app, type, ts), EventIdDerived = true, ReceivedUtcMs = nowMs,
+            });
+        }
+        return list;
+    }
+
+    private static bool TryParseLogTime(string text, out long utcMs, out int offsetMinutes)
+    {
+        if (TryParseTimestamp(text, out utcMs, out offsetMinutes)) return true;
+        foreach (var culture in new[] { "ko-KR", "en-US" })
+            if (DateTime.TryParse(text, CultureInfo.GetCultureInfo(culture), DateTimeStyles.AssumeLocal, out var local))
+            {
+                var dto = new DateTimeOffset(local);
+                utcMs = dto.ToUnixTimeMilliseconds();
+                offsetMinutes = (int)dto.Offset.TotalMinutes;
+                return true;
+            }
+        return false;
+    }
+
     public static string DerivedId(string device, string app, string type, long tsUtcMs)
     {
         var key = $"{device}|{app.ToLowerInvariant()}|{type}|{tsUtcMs / 1000}";
@@ -164,8 +212,8 @@ public static partial class AppEvents
 
     private static string? NormalizeType(string? t) => (t ?? "").Trim().ToLowerInvariant() switch
     {
-        "opened" or "open" or "is opened" => Opened,
-        "closed" or "close" or "is closed" => Closed,
+        "opened" or "open" or "is opened" or "열림" => Opened,
+        "closed" or "close" or "is closed" or "닫힘" => Closed,
         _ => null,
     };
 

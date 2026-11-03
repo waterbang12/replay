@@ -22,6 +22,7 @@ internal sealed class RecorderHost : IAsyncDisposable
     public string? SyncError { get; private set; }
     public SyncServer? Sync => _sync;
     public PhoneDnsLogger? PhoneDns => _dns;
+    public ICloudLogImporter ICloudLog { get; }
     public string? PhoneDnsError { get; private set; }
 
     private readonly ExclusionWatcher _exclusions;
@@ -47,6 +48,7 @@ internal sealed class RecorderHost : IAsyncDisposable
         _persistConfig = persistConfig;
         Controller = new RecordingController(new RecorderContext(store, paths, deviceId), cfg);
         Pairing = new PairingStore(paths.SyncDir);
+        ICloudLog = new ICloudLogImporter(this);
 
         SystemEvents.PowerModeChanged += OnPowerModeChanged;
         System.Net.NetworkInformation.NetworkChange.NetworkAddressChanged += OnNetworkAddressChanged;
@@ -356,6 +358,7 @@ internal sealed class RecorderHost : IAsyncDisposable
         _configDebounce.Dispose();
         await StopSyncAsync();
         await StopPhoneDnsAsync();
+        ICloudLog.Dispose();
         await Controller.DisposeAsync();
     }
 }

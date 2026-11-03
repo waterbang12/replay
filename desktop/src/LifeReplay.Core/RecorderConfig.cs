@@ -44,6 +44,7 @@ public sealed class RecorderConfig
     public SyncSettings Sync { get; set; } = new();
     public PhoneDnsSettings PhoneDns { get; set; } = new();
     public AiWaitSettings AiWait { get; set; } = new();
+    public ICloudLogSettings ICloudLog { get; set; } = new();
 
     [JsonIgnore] public string? LoadWarning { get; private set; }
 
@@ -67,6 +68,7 @@ public sealed class RecorderConfig
         Sync ??= new SyncSettings();
         PhoneDns ??= new PhoneDnsSettings();
         AiWait ??= new AiWaitSettings();
+        ICloudLog ??= new ICloudLogSettings();
         AiWait.IdleSeconds = Math.Clamp(AiWait.IdleSeconds, 5, 600);
         PhoneDns.Upstream = (PhoneDns.Upstream ?? "").Trim();
         if (PhoneDns.Upstream.Length == 0 || PhoneDns.Upstream == "1.1.1.1" ||
@@ -196,4 +198,12 @@ public sealed class AiWaitSettings
     public bool Enabled { get; set; } = true;
     /// <summary>No keyboard/mouse input for this long (while an AI tool is in front or working) starts a wait.</summary>
     public int IdleSeconds { get; set; } = 20;
+}
+
+/// <summary>iPhone events from a log file in iCloud Drive that Shortcuts automations append to (docs/iphone-shortcuts.md).</summary>
+public sealed class ICloudLogSettings
+{
+    public bool Enabled { get; set; } = true;
+    /// <summary>Folder with the LifeReplay*.txt log; empty = the Shortcuts folder in iCloud Drive.</summary>
+    public string Folder { get; set; } = "";
 }

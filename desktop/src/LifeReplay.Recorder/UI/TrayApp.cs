@@ -15,7 +15,7 @@ internal sealed class TrayApp : ApplicationContext
     private readonly string? _dataDirArg;
     private readonly NotifyIcon _tray;
     private readonly ContextMenuStrip _menu;
-    private readonly ToolStripMenuItem _statusItem, _storageItem, _pauseItem, _pause15, _pause60, _blankItem, _autoStartItem, _syncEnabledItem, _syncPairItem, _syncStatusItem;
+    private readonly ToolStripMenuItem _statusItem, _storageItem, _pauseItem, _pause15, _pause60, _blankItem, _autoStartItem, _syncEnabledItem, _syncPairItem, _syncStatusItem, _icloudStatusItem;
     private readonly System.Windows.Forms.Timer _refresh;
     private Hotkey _hotkey;
     private SettingsForm? _settings;
@@ -70,7 +70,9 @@ internal sealed class TrayApp : ApplicationContext
         _syncEnabledItem = new ToolStripMenuItem("Enable iPhone app tracking", null, async (_, _) => await ToggleSync());
         _syncPairItem = new ToolStripMenuItem("Set up iPhone (new token)...", null, (_, _) => ShowPairing());
         var syncMenu = new ToolStripMenuItem("iPhone app tracking");
+        _icloudStatusItem = new ToolStripMenuItem("") { Enabled = false };
         syncMenu.DropDownItems.AddRange([
+            _icloudStatusItem,
             new ToolStripMenuItem("Track phone apps without Shortcuts (network)...", null, (_, _) => ShowPhoneDns()) { Font = new Font(_menu.Font, FontStyle.Bold) },
             new ToolStripSeparator(),
             _syncStatusItem, _syncEnabledItem, _syncPairItem,
@@ -137,6 +139,11 @@ internal sealed class TrayApp : ApplicationContext
         _autoStartItem.Checked = AutoStart.IsEnabled(); // can change outside the app (settings window, scripts)
         var sync = _host.Sync;
         _syncEnabledItem.Checked = _host.Config.Sync.Enabled;
+        var ic = _host.ICloudLog;
+        _icloudStatusItem.Text = !_host.Config.ICloudLog.Enabled ? "iCloud log: off"
+            : ic.LastReadUtcMs is { } read ? $"iCloud log: read {TimeUtil.ToLocal(read):HH:mm}" + (ic.LastError != null ? " ⚠ " + ic.LastError : "")
+            : Directory.Exists(ICloudLogImporter.DefaultFolder()) ? "iCloud log: waiting for LifeReplay.txt" : "iCloud log: iCloud Drive not found";
+        if (_icloudStatusItem.Text.Length > 120) _icloudStatusItem.Text = _icloudStatusItem.Text[..120] + "…";
         _syncStatusItem.Text = sync != null ? $"Listening on port {sync.Port} · {_host.Pairing.Devices.Count} paired" :
             _host.SyncError != null ? $"Error: {_host.SyncError}" : "Off";
         _syncPairItem.Enabled = sync != null;
