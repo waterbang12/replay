@@ -4,9 +4,8 @@ namespace LifeReplay.Tests;
 
 public class AppEventParsingTests
 {
-    private static readonly long Now = DateTimeOffset.Parse("2026-10-29T15:00:00+09:00").ToUnixTimeMilliseconds();
 
-    private static AppEventIngestResult Ingest(TempData t, string body) => AppEvents.Ingest(t.Store, body, Now);
+
 
     [Theory]
     [InlineData("2026-10-29T14:00:00+09:00", "2026-10-29T05:00:00Z", 540)]
@@ -26,64 +25,6 @@ public class AppEventParsingTests
     [InlineData("")]
     [InlineData("yesterday")]
     public void TimestampsWithoutOffsetAreRejected(string input) => Assert.False(AppEvents.TryParseTimestamp(input, out _, out _));
-
-    [Fact]
-    public void AcceptsObjectArrayAndJsonLinesAndSkipsDuplicates()
-    {
-        using var t = new TempData();
-        var e1 = """{"device_id":"iphone","app_name":"Instagram","event_type":"opened","timestamp":"2026-10-29T14:00:00+09:00","event_id":"a"}""";
-        var e2 = """{"device_id":"iphone","app_name":"Instagram","event_type":"closed","timestamp":"2026-10-29T14:24:00+09:00","event_id":"b"}""";
-        Assert.Equal(1, Ingest(t, e1).Accepted);
-        var r = Ingest(t, $"[{e1},{e2}]");
-        Assert.Equal((1, 1), (r.Accepted, r.Duplicates));
-        r = Ingest(t, e1 + "\r\n" + e2 + "\n");
-        Assert.Equal((0, 2), (r.Accepted, r.Duplicates));
-        Assert.Equal(2, t.Store.GetAppEvents(0, long.MaxValue).Count);
-    }
-
-    [Fact]
-    public void MissingEventIdFallsBackToAppTypeAndSecond()
-    {
-        using var t = new TempData();
-        var noId = """{"device_id":"iphone","app_name":"KakaoTalk","event_type":"opened","timestamp":"2026-10-29T14:24:00+09:00"}""";
-        Assert.Equal(1, Ingest(t, noId).Accepted);
-        Assert.Equal(0, Ingest(t, noId).Accepted); // re-sent from the queue: same derived id
-        var stored = t.Store.GetAppEvents(0, long.MaxValue).Single();
-        Assert.True(stored.EventIdDerived);
-        Assert.Equal(AppEvents.DerivedId("iphone", "KakaoTalk", "opened", stored.TsUtcMs), stored.EventId);
-    }
-
-    [Fact]
-    public void InvalidEventsAreReportedAndValidOnesStillStored()
-    {
-        using var t = new TempData();
-        var body = string.Join("\n",
-            """{"device_id":"iphone","app_name":"YouTube","event_type":"opened","timestamp":"2026-10-29T14:00:00+09:00"}""",
-            """{"device_id":"../etc","app_name":"x","event_type":"opened","timestamp":"2026-10-29T14:00:00+09:00"}""",
-            """{"device_id":"iphone","app_name":"x","event_type":"paused","timestamp":"2026-10-29T14:00:00+09:00"}""",
-            """{"device_id":"iphone","app_name":"x","event_type":"opened","timestamp":"2026-10-29T16:00:00+09:00"}""", // 1 h in the future
-            """{"device_id":"iphone","app_name":"x","event_type":"opened","timestamp":"2026-09-01T14:00:00+09:00"}""", // too old
-            "not json");
-        var r = Ingest(t, body);
-        Assert.Equal(1, r.Accepted);
-        Assert.Equal(5, r.Errors.Count);
-        Assert.Contains(r.Errors, e => e.Contains("device_id"));
-        Assert.Contains(r.Errors, e => e.Contains("event_type"));
-        Assert.Contains(r.Errors, e => e.Contains("future"));
-        Assert.Contains(r.Errors, e => e.Contains("30 days"));
-        Assert.Contains(r.Errors, e => e.Contains("not valid JSON"));
-    }
-
-    [Fact]
-    public void ShortcutsStyleValuesAreNormalized()
-    {
-        using var t = new TempData();
-        // Shortcuts' own wording ("Is Opened") and camelCase keys are accepted; control characters are stripped.
-        var r = Ingest(t, "{\"deviceId\":\"iphone\",\"appName\":\" Safari\\u0007 \",\"eventType\":\"Is Opened\",\"timestamp\":\"2026-10-29T14:00:00+09:00\"}");
-        Assert.Equal(1, r.Accepted);
-        var e = t.Store.GetAppEvents(0, long.MaxValue).Single();
-        Assert.Equal(("Safari", "opened", "ios_shortcuts"), (e.App, e.Type, e.Source));
-    }
 }
 
 public class AppSessionTests
@@ -136,6 +77,17 @@ public class AppSessionTests
             E("YouTube", "opened", "19:40:00"), E("YouTube", "closed", "19:45:00"),
         ]);
         Assert.Equal(["YouTube 19:38-19:38 Complete", "YouTube 19:40-19:45 Complete"], s.Select(Show).ToArray());
+    }
+
+    [Fact]
+    public void RepeatedClosesAreDroppedForEveryApp()
+    {
+        var s = AppSessions.Reconstruct([
+            E("Instagram", "opened", "10:00"), E("Instagram", "closed", "10:05"), E("Instagram", "closed", "10:05:08"),
+            E("Discord", "opened", "10:06"), E("Discord", "closed", "10:07"), E("Discord", "closed", "10:07:10"),
+            E("Instagram", "closed", "10:08"),                       // still closed: dropped, not a missing event
+        ]);
+        Assert.Equal(["Instagram 10:00-10:05 Complete", "Discord 10:06-10:07 Complete"], s.Select(Show).ToArray());
     }
 
     [Fact]

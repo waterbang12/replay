@@ -78,9 +78,9 @@ public partial class MainWindow
         var (syncText, stale) = TimelineControl.PhoneSyncText(_timeline);
 
         SummaryTitle.Text = $"iPhone apps · {_day:ddd, MMM d}";
-        SummarySubtitle.Text = _timeline.PhoneStatus.Count == 0 && _timeline.PhoneLastNetworkMs == null
-            ? "No phone data yet. Easiest: tray → iPhone app tracking → \"Track phone apps without Shortcuts\"."
-            : "From the phone's network lookups (≈, estimated) and any Shortcuts automations (exact). Click a row to jump there.";
+        SummarySubtitle.Text = _timeline.PhoneStatus.Count == 0
+            ? "No iPhone events yet. Set up the Shortcuts automations (guide: docs/iphone-shortcuts.md)."
+            : "From Shortcuts \"App is opened / closed\" automations (iCloud log). Only apps you set up are tracked. Click a row to jump there.";
         SummaryList.Children.Clear();
 
         SummaryList.Children.Add(Text((stale ? "⚠ " : "") + syncText + (stale ? " — the iPhone hasn't sent events for a while (offline, Tailscale off, or automations disabled)" : ""),
@@ -112,7 +112,7 @@ public partial class MainWindow
             SummaryList.Children.Add(Bar(t.TotalMs / (double)max, Accent));
         }
 
-        var incomplete = sessions.Where(s => s.Confidence is not (SessionConfidence.Complete or SessionConfidence.Estimated)).ToList();
+        var incomplete = sessions.Where(s => s.Confidence != SessionConfidence.Complete).ToList();
         if (incomplete.Count == 0) return;
         SummaryList.Children.Add(Text($"Missing events ({incomplete.Count})", 13, bold: true, margin: new Thickness(0, 12, 0, 2)));
         SummaryList.Children.Add(Text("Sessions where an \"opened\" or \"closed\" event never arrived. Often a Shortcuts automation that didn't run or isn't set up for both events.", 11.5, color: Muted, margin: new Thickness(0, 0, 0, 4)));

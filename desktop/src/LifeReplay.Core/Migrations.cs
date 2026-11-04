@@ -229,6 +229,10 @@ public static class Migrations
             );
             CREATE INDEX ix_ai_waits_start ON ai_waits(start_utc);
             """),
+        (9, """
+            -- Phone DNS tracking was removed (iPhone events now come from the Shortcuts log file in iCloud Drive).
+            DROP TABLE IF EXISTS dns_hits;
+            """),
     ];
 
     public static int LatestVersion => All[^1].Version;

@@ -41,8 +41,6 @@ public sealed class RecorderConfig
     public int IdleMinutes { get; set; } = 5;
     /// <summary>Optional daily recording hours; outside them the recorder stays in the tray but doesn't record.</summary>
     public RecordingHours Hours { get; set; } = new();
-    public SyncSettings Sync { get; set; } = new();
-    public PhoneDnsSettings PhoneDns { get; set; } = new();
     public AiWaitSettings AiWait { get; set; } = new();
     public ICloudLogSettings ICloudLog { get; set; } = new();
 
@@ -65,18 +63,11 @@ public sealed class RecorderConfig
         IdleMinutes = Math.Clamp(IdleMinutes, 1, 120);
         ExcludedProcesses ??= [];
         ExcludedWindowTitles ??= [];
-        Sync ??= new SyncSettings();
-        PhoneDns ??= new PhoneDnsSettings();
         AiWait ??= new AiWaitSettings();
         ICloudLog ??= new ICloudLogSettings();
         AiWait.IdleSeconds = Math.Clamp(AiWait.IdleSeconds, 5, 600);
-        PhoneDns.Upstream = (PhoneDns.Upstream ?? "").Trim();
-        if (PhoneDns.Upstream.Length == 0 || PhoneDns.Upstream == "1.1.1.1" ||
-            !PhoneDns.Upstream.Equals("auto", StringComparison.OrdinalIgnoreCase) && !System.Net.IPAddress.TryParse(PhoneDns.Upstream, out _))
-            PhoneDns.Upstream = "auto";
         Hours ??= new RecordingHours();
         Hours.Normalize();
-        Sync.Port = Math.Clamp(Sync.Port, 1024, 65535);
     }
 
     public static readonly JsonSerializerOptions JsonOptions = new()
@@ -166,31 +157,6 @@ public sealed class RecordingHours
     public string Describe() => Enabled ? $"{Start}–{End}{(WeekdaysOnly ? ", Mon–Fri" : "")}" : "all day";
 }
 
-public sealed class SyncSettings
-{
-    /// <summary>Off by default. When on, an HTTPS endpoint (token auth) accepts iPhone app-usage events from Shortcuts.</summary>
-    public bool Enabled { get; set; } = false;
-    public int Port { get; set; } = 47800;
-    /// <summary>
-    /// Address to listen on. 127.0.0.1 (default) = reachable only through Tailscale Serve on this PC, which is
-    /// the supported setup; 0.0.0.0 = all networks (the PC's firewall still applies).
-    /// </summary>
-    public string BindAddress { get; set; } = "127.0.0.1";
-}
-
-/// <summary>
-/// Phone app tracking without Shortcuts: a DNS server on this PC's Tailscale address. Every lookup is passed on to
-/// <see cref="Upstream"/>; only lookups that belong to a known app (<see cref="NetworkApps"/>) are stored.
-/// </summary>
-public sealed class PhoneDnsSettings
-{
-    public bool Enabled { get; set; } = false;
-    /// <summary>
-    /// Where lookups are forwarded (plain DNS over UDP). "auto": this PC's current DNS servers plus 8.8.8.8 and
-    /// 1.1.1.1, all asked at once (some networks block outside DNS servers). Or one IP address.
-    /// </summary>
-    public string Upstream { get; set; } = "auto";
-}
 
 /// <summary>Logs time waiting on AI tools as "Waiting on AI" (not progress). See <see cref="AiTools"/>.</summary>
 public sealed class AiWaitSettings

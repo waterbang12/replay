@@ -5,17 +5,14 @@
 ```
 desktop/
   src/LifeReplay.Core      .NET 10 library: SQLite store + migrations, MP4 integrity check, crash recovery,
-                           retention, day timeline/gap model, iPhone app events + session rebuilding
+                           retention, day timeline/gap model, iPhone app events (from the iCloud log) + session rebuilding
                            (AppEvents, AppSessions), config, logging. No Windows APIs.
-  src/LifeReplay.Sync      Opt-in HTTPS endpoint (127.0.0.1, bearer token) for iPhone Shortcuts app events,
-                           published to the tailnet with Tailscale Serve. See docs/iphone-shortcuts.md.
   src/LifeReplay.Recorder  LifeReplay.exe: tray app + capture/encode pipeline (WinForms, WinRT, Direct3D 11).
   src/LifeReplay.Viewer    LifeReplay.Viewer.exe: WPF replay app (calendar, timeline, multi-screen playback).
   src/LifeReplay.Coach     Coach library: deterministic schedule evaluator, notification rules, sanitized context,
                            OpenAI Responses provider, answer validator, audit log/budget (see docs/coach.md).
   src/LifeReplay.CoachTray LifeReplay.CoachTray.exe: separate tray process for coach notifications.
-  tests/LifeReplay.Tests   xUnit tests for Core, Sync, Analysis and Coach.
-shared/                    iPhone event protocol (sync-protocol.md).
+  tests/LifeReplay.Tests   xUnit tests for Core, Analysis and Coach.
 ```
 
 The recorder and the viewer are separate processes. A viewer crash can't stop recording, and the viewer
@@ -39,8 +36,7 @@ the MP4 files, and `status.json`, which the recorder rewrites every 5 s.
   conversion, scaling and H.264 encoding run on the GPU (Intel Quick Sync on this machine).
 - `HardwareAccelerationEnabled = true` lets Media Foundation pick the GPU encoder and fall back to its software encoder.
   If the hardware path fails twice, the recorder switches to software for the rest of the run.
-- No FFmpeg or native DLLs to ship. Dependencies: Vortice.Direct3D11 (thin D3D11 wrapper), Microsoft.Data.Sqlite,
-  QRCoder (pairing QR code).
+- No FFmpeg or native DLLs to ship. Dependencies: Vortice.Direct3D11 (thin D3D11 wrapper), Microsoft.Data.Sqlite.
 
 **One sample per frame slot (important).** The Media Foundation pipeline writes a constant-frame-rate MP4.
 Testing showed two behaviours that matter for a "what was on screen at time T" recorder:
@@ -145,7 +141,6 @@ Other events:
   recordings/YYYY-MM-DD/windows/<displayId>/thumbs/<segment>_<offsetSec>.jpg
   recordings/YYYY-MM-DD/iphone/<deviceId8>/HH-mm-ss_<segment>.mp4
   logs/recorder-YYYYMMDD.log, viewer-YYYYMMDD.log   (kept 14 days)
-  sync/pairing.json, certificate-thumbprint.txt
 ```
 Dates and times in paths are local; database timestamps are UTC.
 

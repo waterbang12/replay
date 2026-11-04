@@ -15,7 +15,6 @@ public sealed class RecorderStatus
     public long EstimatedMaxBytesPerHour { get; set; }
     public string? LastError { get; set; }
     public bool Blanked { get; set; }
-    public bool SyncEnabled { get; set; }
 
     public void Save(string path)
     {

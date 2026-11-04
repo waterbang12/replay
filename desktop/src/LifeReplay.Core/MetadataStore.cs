@@ -212,14 +212,13 @@ public sealed class MetadataStore
         return list;
     }
 
-    /// <summary>Hours (UTC ms / 3,600,000) with any time record (window log, iPhone events, phone lookups), for the day list.</summary>
+    /// <summary>Hours (UTC ms / 3,600,000) with any time record (window log, iPhone events), for the day list.</summary>
     public List<long> GetActivityHours()
     {
         using var c = Open();
         using var cmd = Cmd(c, """
             SELECT start_utc / 3600000 FROM focus_events
             UNION SELECT ts_utc / 3600000 FROM app_events
-            UNION SELECT ts_utc / 3600000 FROM dns_hits
             """);
         using var r = cmd.ExecuteReader();
         var list = new List<long>();
@@ -405,43 +404,6 @@ public sealed class MetadataStore
     }
 
     public int DeleteAppEventsBefore(long utcMs) => Exec("DELETE FROM app_events WHERE ts_utc < $t", ("$t", utcMs));
-
-    // ---------------------------------------------------------------- phone network lookups
-
-    public void InsertDnsHits(IEnumerable<DnsHit> hits)
-    {
-        using var c = Open();
-        using var tx = c.BeginTransaction();
-        foreach (var h in hits)
-        {
-            using var cmd = Cmd(c, "INSERT INTO dns_hits(device_id, ts_utc, domain, app) VALUES($d, $t, $n, $a)", tx,
-                ("$d", h.DeviceId), ("$t", h.TsUtcMs), ("$n", h.Domain), ("$a", h.App));
-            cmd.ExecuteNonQuery();
-        }
-        tx.Commit();
-    }
-
-    public List<DnsHit> GetDnsHits(long startMs, long endMs)
-    {
-        using var c = Open();
-        using var cmd = Cmd(c, "SELECT device_id, ts_utc, domain, app FROM dns_hits WHERE ts_utc >= $s AND ts_utc < $e ORDER BY ts_utc", null,
-            ("$s", startMs), ("$e", endMs));
-        using var r = cmd.ExecuteReader();
-        var list = new List<DnsHit>();
-        while (r.Read()) list.Add(new DnsHit(r.GetString(0), r.GetInt64(1), r.GetString(2), r.GetString(3)));
-        return list;
-    }
-
-    public long? LastDnsHitUtcMs()
-    {
-        using var c = Open();
-        using var cmd = Cmd(c, "SELECT MAX(ts_utc) FROM dns_hits");
-        using var r = cmd.ExecuteReader();
-        r.Read();
-        return NLong(r, 0);
-    }
-
-    public int DeleteDnsHitsBefore(long utcMs) => Exec("DELETE FROM dns_hits WHERE ts_utc < $t", ("$t", utcMs));
 
     // ---------------------------------------------------------------- analysis caches
 

@@ -1,225 +1,73 @@
-# iPhone app tracking with Shortcuts
+# iPhone app tracking with Shortcuts (iCloud log)
 
-> **Easier option:** [phone-network-tracking.md](phone-network-tracking.md) needs no Shortcuts at all (one-time
-> setup, estimated times). Use this guide when you want exact open/close times for a few apps.
-
-## Most reliable: append to a file in iCloud Drive
-
-No server, Tailscale or network needed when the event happens. The phone writes the time itself.
-1. iPhone: Settings → your name → iCloud → iCloud Drive on. PC: the iCloud app → iCloud Drive on (it appears as
-   `%USERPROFILE%\iCloudDrive`; the Shortcuts folder is `iCloud~is~workflow~my~workflows`).
-2. Each automation has one action, **Append to Text File** (텍스트 파일에 추가):
-   - text `YouTube opened ` followed by the **Current Date** variable (tap it → Date Format **ISO 8601**,
-     Include Time on);
-   - file `LifeReplay.txt`, in the Shortcuts folder, with **Make New Line** on.
-3. LifeReplay checks `LifeReplay*.txt` there every 30 s (`iCloudLog` in config.json). Lines look like
-   `YouTube opened 2026-11-03T16:21:50+09:00`. "열림/닫힘" and the phone's Korean date format work too.
-   Reading the file again only finds duplicates.
-
-Delay: iCloud usually syncs within a few minutes. Tray → iPhone app tracking shows "iCloud log: read HH:mm".
-
-## Quick setup: one action per automation (needs the PC and Tailscale at the moment of the event)
-
-1. PC: tray → **iPhone app tracking** → **Set up iPhone (new token)…** shows a QR code.
-2. iPhone (Tailscale on): scan it with the Camera app. Safari opens the setup page (Korean) at
-   `https://<pc>.<tailnet>.ts.net/setup?k=<token>`. It shows "✓ PC와 연결됨" when it can reach the PC.
-3. For each app, tap **열림 복사** (opened). In Shortcuts: Automation → + → App → pick the app → **Is Opened**
-   only → **Run Immediately** → New Blank Automation → add **Get Contents of URL** → tap "URL" → paste. Repeat
-   with **닫힘 복사** (closed) and **Is Closed**.
-
-Each automation only opens `GET /api/v1/e?app=<name>&ev=opened|closed&k=<token>`. The time is when the PC receives
-it. There is **no offline queue**: events made while the PC or Tailscale is unreachable are lost. When you need
-those too, use the full recipe below (shared shortcut with a queue file).
-
-## Full setup (with an offline queue)
-
-LifeReplay can log **which iPhone apps you open and close** and show that next to your Windows time. It uses
-Apple's built-in Shortcuts app: a personal automation per app runs when the app opens or closes and sends one small
-event to the recorder on your PC. Nothing is recorded on the phone's screen, and no App Store app is needed.
-
-> **Status:** the PC side (endpoint, storage, session rebuilding, viewer) is implemented and tested with `curl`.
-> The steps on the iPhone below were written from Apple's documentation and community reports and have **not been
-> run on a real iPhone yet**. Shortcuts labels change between iOS versions; if a label differs, look for the
-> closest equivalent. Please report what you find (see "Test on a real device").
+LifeReplay can log **which iPhone apps you open and close** and show that next to your Windows time. Apple's
+Shortcuts app runs a personal automation when an app opens or closes. The automation adds one line to a text file
+in your iCloud Drive, and the recorder on the PC reads that file. Nothing is recorded on the phone's screen, no App
+Store app is needed, and nothing listens on the network.
 
 ## How it works
 
 ```
-App opened ─► Automation "Instagram · opened" ─► Run shortcut "LifeReplay Log" {app, event}
-                                                   1. build a JSON line with the current time
-                                                   2. append it to LifeReplay/queue.txt (iCloud Drive › Shortcuts)
-                                                   3. POST the whole queue to https://<pc>.<tailnet>.ts.net/api/v1/app-events
-                                                   4. if the PC answered, delete the queue
+iPhone: "YouTube" opens
+  → automation: append "YouTube opened 2026-11-03T16:21:50+09:00" to LifeReplay.txt (iCloud Drive, Shortcuts folder)
+  → iCloud syncs the file to the PC (iCloud for Windows)
+  → the recorder checks LifeReplay*.txt every 30 s and stores new lines (app_events)
+  → the viewer pairs opened/closed into sessions (📱 lane, Summary → iPhone)
 ```
 
-If the PC is off or the phone is offline, step 3 fails, the queue file stays, and the next event sends everything
-again. The PC ignores events it already has, so sending the same line twice is harmless.
+- **The phone writes the time.** Events made while the PC is off, asleep or offline wait in iCloud and arrive
+  later with their real times.
+- **Re-reading is harmless.** Event ids come from app + event + second, so lines already read are duplicates.
+- **Accepted lines:** `<app> opened|closed <date>`. "열림/닫힘" work too. The date can be ISO 8601 with an offset,
+  or the phone's Korean format (`2026. 11. 3. 오후 4:40:05`, read as the PC's local time). Other lines are skipped,
+  and the tray shows the first one it didn't understand.
 
-## Why Tailscale
+## Setup
 
-Shortcuts only talks to HTTPS servers with a **publicly trusted certificate**. It rejects LifeReplay's own
-self-signed certificate, and installing a private root certificate on iOS is unreliable. Tailscale Serve gives the
-PC a real certificate for `<pc>.<tailnet>.ts.net`, reachable **only by your own devices** (your tailnet). It works on
-the same Wi-Fi, on mobile data, and on other networks. It is free for personal use.
+1. **iPhone:** Settings → your name → iCloud → **iCloud Drive** on.
+2. **PC:** the **iCloud** app (iCloud for Windows) → sign in with the same Apple ID → **iCloud Drive** on. It
+   appears as `%USERPROFILE%\iCloudDrive`; the Shortcuts folder shows as `iCloud~is~workflow~my~workflows`.
+3. **Each app gets two automations** (opened and closed). Shortcuts → Automation → **+** → **App** → choose the
+   app → **Is Opened** only → **Run Immediately** → Next → **New Blank Automation**, then add one action,
+   **Append to Text File** (텍스트 파일에 추가):
+   - **Text:** `YouTube opened ` followed by the **Current Date** variable. Tap it → Date Format **ISO 8601**, and
+     turn **Include Time** on.
+   - **File:** `LifeReplay.txt` in the Shortcuts folder. Expand the action and turn **Make New Line** on.
 
-Not supported on purpose: plain HTTP, port forwarding, `tailscale funnel` (that would put the endpoint on the
-public internet).
+   Then do the same with **Is Closed** and `YouTube closed `.
+4. If the file doesn't appear on some iOS versions (Append doesn't create a missing file), create it once: a
+   shortcut with **Text** `start` → **Save File** → `LifeReplay.txt`, with "Ask Where to Save" off.
+5. **Check:** open and close the app, wait 1–3 minutes, then look at tray → **iPhone app tracking** →
+   "iCloud log: read HH:mm". Press F5 in the viewer.
 
-## 1. Windows setup
+## How sessions are rebuilt
 
-In PowerShell:
-
-```powershell
-winget install --id Tailscale.Tailscale -e      # then sign in from the Tailscale tray icon
-```
-
-In the Tailscale admin console (https://login.tailscale.com/admin/dns):
-- **MagicDNS**: on (it usually is by default).
-- **HTTPS Certificates**: Enable.
-
-Then:
-
-```powershell
-tailscale status                                         # this PC should be listed with a name
-tailscale serve --bg https+insecure://127.0.0.1:47800    # forward https://<pc>.<tailnet>.ts.net → LifeReplay
-tailscale serve status                                   # shows the https://….ts.net address
-```
-
-(`https+insecure` means "the local target uses HTTPS with a self-signed certificate". That hop never leaves the
-PC. If `tailscale serve` says access is denied, run it once from an administrator terminal. `--bg` keeps it on
-across restarts. `tailscale serve reset` removes it.)
-
-In LifeReplay: tray icon → **iPhone app tracking** → **Enable iPhone app tracking**, then **Set up iPhone (new
-token)…**. The window shows:
-- the **URL** (`https://<pc>.<tailnet>.ts.net/api/v1/app-events`, read from Tailscale);
-- the **Authorization value** (`Bearer <token>`), shown only this once;
-- a QR code with the token.
-
-Keep the window open for step 3.
-
-Test from the PC (replace the URL and token):
-
-```powershell
-curl.exe -s https://<pc>.<tailnet>.ts.net/api/v1/hello -H "Authorization: Bearer <token>"
-# → {"server":"<PC name>","apiVersion":2}
-```
-
-## 2. iPhone: install Tailscale
-
-Install **Tailscale** from the App Store, sign in with the same account, and turn it on. To keep it connected,
-use the **VPN On Demand** option in the Tailscale app's settings, if your version has it. Without it, events queue
-up whenever Tailscale is off and are sent the next time it's on.
-
-Check: Safari → `https://<pc>.<tailnet>.ts.net/api/v1/hello`. It should show a blank page or "401", not a
-certificate warning. 401 is correct here, because Safari sends no token.
-
-## 3. iPhone: the shared shortcut "LifeReplay Log"
-
-Shortcuts app → **Shortcuts** tab → **+** → name it exactly `LifeReplay Log`. Add these actions in order (search for
-each name in the action search bar):
-
-1. **Get Dictionary Value**: Get **Value** for key `app` in **Shortcut Input**.
-   Then **Set Variable**: name `App`, input **Dictionary Value**.
-2. **Get Dictionary Value**: Get **Value** for key `event` in **Shortcut Input**.
-   Then **Set Variable**: name `Event`.
-3. **Current Date**, then **Format Date**: Date Format **ISO 8601**, turn **Include ISO 8601 Time** on.
-   Then **Set Variable**: name `Stamp`. (The result looks like `2026-10-29T14:00:00+09:00`. The UTC offset is required.)
-4. **Text**, with the variables inserted where shown (tap in the text, then pick the variable):
-   ```
-   {"device_id":"iphone","source":"ios_shortcuts","app_name":"[App]","event_type":"[Event]","timestamp":"[Stamp]","event_id":"[App]-[Event]-[Stamp]"}
-   ```
-   It must be one line. Don't use `"` in app names.
-5. **Append to Text File**: append **Text** to file path `LifeReplay/queue.txt` (in the Shortcuts folder), with
-   **Make New Line** on. If your iOS has no "Append to Text File", skip steps 5–6 and 8, and send **Text** in step 7
-   instead. That version has no offline retry: events made while the PC is unreachable are lost.
-6. **Get File from Folder**: folder **Shortcuts**, path `LifeReplay/queue.txt`, **Error If Not Found** off.
-7. **Get Contents of URL**:
-   - URL: the URL from the setup window
-   - Method: **POST**
-   - Headers: `Authorization` = `Bearer <token>` (paste the whole value from the setup window); `Content-Type` = `text/plain`
-   - Request Body: **File** → the **File** from step 6
-8. **If** **Contents of URL** **contains** `accepted`:
-   - **Delete Files**: **File** (from step 6), with **Confirm Before Deleting** off.
-   - **End If**
-
-Test it: temporarily add a **Dictionary** action at the top (`app` = `Test`, `event` = `opened`) and pass it in, or
-run it from an automation (step 4). On the first run iOS asks whether "LifeReplay Log" may connect to
-`<pc>.<tailnet>.ts.net`. Tap **Always Allow**, otherwise background runs will fail. Remove the test Dictionary afterwards.
-
-**The token is stored in this shortcut.** Don't share the shortcut. If the phone is lost, use tray → iPhone app
-tracking → **Revoke all paired iPhones**.
-
-## 4. iPhone: one automation per app and event
-
-Shortcuts → **Automation** tab → **+** (or "New Automation") → **App**:
-
-1. **Choose** → select one app, e.g. **Instagram**.
-2. Tick **Is Opened** only.
-3. Select **Run Immediately**, and turn **Notify When Run** off.
-4. **Next** → **New Blank Automation** → add **Dictionary**: `app` = `Instagram`, `event` = `opened`.
-5. Add **Run Shortcut** → **LifeReplay Log**, input **Dictionary**.
-
-Repeat with **Is Closed** and `event` = `closed`, then for each app you care about (e.g. Instagram, KakaoTalk,
-YouTube, Safari). That is 2 automations per app.
-
-**Why not one automation for all apps?** You can pick several apps in a single "App" automation. But I found no
-evidence that Shortcuts tells the automation *which* app triggered it; there is no "triggering app" variable.
-So the app name must be written into each automation. If you find a way on your iOS version, one automation per
-event type would be enough: the server only needs `app_name`.
-
-`.shortcut` files: importing one requires a file signed by Apple's tooling (on macOS, `shortcuts sign`) or an iCloud
-share link. This repository can't provide a signed file, so the shortcut has to be built by hand as above.
-
-## 5. Look at it
-
-Viewer → the **📱 iPhone apps** lane appears under the screens once the first event arrives. Use **Summary → iPhone**
-for per-app totals, missing events, and "Windows + iPhone" combined. The lane label shows the last sync time, with a
-⚠ after 12 h without events.
-
-## Test on a real device
-
-1. Set up two apps (4 automations), e.g. Instagram and KakaoTalk.
-2. Write down the exact times you do this:
-   1. open Instagram (~2 min);
-   2. switch to KakaoTalk via the app switcher (~1 min);
-   3. go to the home screen;
-   4. open Instagram again and lock the phone while it's open.
-3. On the PC: `curl.exe -s https://<pc>.<tailnet>.ts.net/api/v1/hello -H "Authorization: Bearer <token>"` still
-   works, and `%LOCALAPPDATA%\LifeReplay\logs\` shows lines like `Sync: app events from 127.0.0.1: 1 new, 0 duplicate`.
-4. Viewer → refresh (F5) → check that the lane and Summary → iPhone match your notes. Expect a **Complete** session for
-   each open→close pair. Check whether "Is Closed" fires when the phone locks or when you use the app switcher; if
-   not, the session shows as inferred or unknown.
-5. **Offline:** turn Tailscale off on the phone, open and close an app, then turn Tailscale on and open any tracked
-   app. The earlier events should arrive with their original times (`… 3 new` in the log).
-6. **Compare with Screen Time** (Settings → Screen Time → See All App & Website Activity → Day) at the end of a day.
-   Screen Time counts differently (e.g. picture-in-picture, audio, widgets), so expect differences of minutes. Large
-   gaps usually mean an automation didn't run. Look at the "Missing events" list in Summary → iPhone.
-7. Note anything that differs from this guide (labels, permission prompts, failures) in an issue.
+- An "opened" followed by that app's "closed" is a **complete** session.
+- No "closed", but another app opened within 30 min: the session ends then (**end inferred**).
+- A "closed" with no "opened" before it: it starts at the previous event if that's within 30 min
+  (**start inferred**), otherwise the duration is **unknown** and isn't counted.
+- **Duplicates are dropped:**
+  - the same app and event within 2 s (double triggers);
+  - an "opened" for an app that's already open (the first start is kept);
+  - a "closed" for an app that's **already closed**. For example, a Screen Time limit makes iOS send "closed"
+    again a few seconds later.
 
 ## Limitations (iOS)
 
-- **Only apps with automations** are tracked. Nothing is read from Screen Time; Apple offers no API for its data
-  outside Apple's own frameworks.
-- **Automations can be late or not run**: Low Power Mode, a locked phone, Focus or iOS deciding not to run them can
-  delay or skip events. The viewer shows these as inferred or unknown sessions rather than guessing.
-- **"Is Closed"** may fire later than you leave the app, or not at all in some cases (locking the phone, app switcher).
-  Verify on your iOS version.
-- **Each run does a network request.** When the PC is unreachable, iOS may show a failure notification for the
-  automation. The queue keeps the events and sends them with the next successful run, and only then. There is no
-  timed background retry.
-- **The token lives in the shortcut** (Shortcuts has no secure storage). Anyone who can open your Shortcuts can read it.
-- **Queue file limit:** if the PC is unreachable for a very long time and the queue grows over 2 MB (about 10,000
-  events), the PC answers 413. Delete `Shortcuts/LifeReplay/queue.txt` in the Files app.
-- **Times come from the phone's clock.** If the phone's clock is more than 2 minutes ahead of the PC, sessions get a
-  "phone clock ahead" note.
-- **No signed `.shortcut` file** (see above), so setup is manual.
+- **Only apps with automations** are tracked. Apple offers no way to read Screen Time data on Windows.
+- **Delay:** iCloud sync usually takes a few minutes, longer in Low Power Mode.
+- **Automations can be late or skipped**: Low Power Mode, Focus, or iOS deciding not to run them. The viewer shows
+  those sessions as inferred or unknown rather than guessing.
+- **"Is Closed"** may not fire when you lock the phone. The session then ends when the next app opens.
+- The file keeps growing (about 50 bytes per event, a few MB a year). Deleting it in the Files app is safe; events
+  already read stay in LifeReplay.
 
 ## Troubleshooting
 
-| Symptom | Check |
+| Symptom | Fix |
 |---|---|
-| Nothing arrives, the log shows nothing | Tailscale on? `tailscale serve status` on the PC? Tray → iPhone app tracking enabled? |
-| Log: `rejected request … (bad token)` | Header must be exactly `Authorization: Bearer <token>`. Each "Set up iPhone" creates an additional token (older ones keep working); "Revoke all paired iPhones" invalidates every token. |
-| Log: `rejected … timestamp must be ISO 8601 with a UTC offset` | In step 3, Format Date must be **ISO 8601** with time included. |
+| Tray says "iCloud Drive not found" | Turn on iCloud Drive in the iCloud app on the PC. |
+| Tray says "waiting for LifeReplay.txt" | Check Files → iCloud Drive → Shortcuts on the phone; create the file (Setup step 4). |
+| "⚠ … not understood" | Usually the date: tap the Current Date variable → ISO 8601 with time. |
 | Only "opened" events arrive | The "Is Closed" automations are missing or have Run Immediately off. |
-| Safari shows a certificate warning for the ts.net URL | HTTPS Certificates not enabled in the Tailscale admin console. |
+| A "closed" arrives together with every "opened" | That app's "closed" automation has **Is Opened** ticked too. |

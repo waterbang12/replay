@@ -7,15 +7,13 @@ timeline for looking back at your day.
   Windows.Graphics.Capture and the GPU's hardware encoder. 10 fps, 1080p, about 560 MB per hour per monitor by default.
 - **Viewer** (`LifeReplay.Viewer.exe`): pick a day, see every screen on one timeline, play at 1–16×, scrub with
   thumbnail previews, jump to a time, skip gaps and idle stretches, delete recordings.
-- **Phone app usage without Shortcuts** (easiest): the PC acts as the phone's DNS server over Tailscale and turns
-  each app's server lookups into estimated sessions on the 📱 lane. One-time setup, no per-app work. Setup:
-  [docs/phone-network-tracking.md](docs/phone-network-tracking.md).
-- **iPhone app usage, exact** (no iPhone app needed): Apple Shortcuts automations ("App is opened / closed") send small
-  events to the recorder, and the viewer shows an iPhone lane and per-app totals next to your Windows time.
-  No screen recording on the iPhone. Setup: [docs/iphone-shortcuts.md](docs/iphone-shortcuts.md).
+- **iPhone app usage** (no iPhone app needed): Apple Shortcuts automations ("App is opened / closed") append a
+  line to a log file in iCloud Drive. The recorder reads it, and the viewer shows an iPhone lane and per-app totals
+  next to your Windows time. Nothing is lost while the PC is off. No screen recording on the iPhone. Setup:
+  [docs/iphone-shortcuts.md](docs/iphone-shortcuts.md).
 
-Everything stays on your PC. Nothing is uploaded to any cloud service. iPhone app tracking (HTTPS, token, reachable
-only through your own Tailscale network) is off until you enable it.
+Everything stays on your PC. Nothing is uploaded to any cloud service. iPhone app tracking goes through your own
+iCloud Drive (a text file the Shortcuts automations write), and the PC only reads it.
 
 ## Status
 
@@ -32,12 +30,9 @@ only through your own Tailscale network) is off until you enable it.
 | Auto-start with Windows, restart after crash | ⚠️ Implemented (Run key, RegisterApplicationRestart), not exercised |
 | Replay viewer: date, timeline, seek, jump, 1–16×, multi-screen | ✅ Verified (UI Automation + screenshots) |
 | Thumbnail hover preview | ⚠️ Thumbnails generated and verified on disk; hover popup not exercised (needs a real mouse) |
-| iPhone app-usage endpoint (HTTPS, token, validation, dedupe, offline queue format) | ✅ Unit tests + end-to-end with `curl` against the real recorder |
+| iPhone log file in iCloud Drive (ISO and Korean dates, re-reading, duplicates) | ✅ Unit tested + real iPhone automations (YouTube, Instagram, Discord, Chrome) |
 | iPhone session reconstruction (missing/duplicate/out-of-order events, midnight) | ✅ Unit tested |
-| iPhone lane + "iPhone" summary in the viewer | ✅ Verified with events sent by `curl` (screenshot); hover popup not exercised |
-| Phone DNS tracking: forwarding, storing only listed apps, sessions from lookups | ✅ Unit tests (real UDP forwarder against a fake upstream) + `nslookup` through the installed recorder on the PC's Tailscale address |
-| Phone DNS tracking from a real iPhone (Tailscale nameserver set) | ❌ **Not tested on a device yet** |
-| Shortcuts automations on a real iPhone, Tailscale Serve | ❌ **Not tested on a device** — follow the test procedure in docs/iphone-shortcuts.md |
+| iPhone lane + "iPhone" summary in the viewer | ✅ Verified with real iPhone events; hover popup not exercised |
 
 Full test log with numbers: [docs/testing.md](docs/testing.md). Design: [docs/architecture.md](docs/architecture.md).
 
@@ -72,7 +67,7 @@ desktop\bin\Debug\LifeReplay.Viewer.exe --data-dir C:\temp\lr-test
 ## Using it
 
 **Tray menu:** status, storage used, pause / resume / pause 15 min / pause 1 h, black out video, open replay, open recordings
-folder, settings, start with Windows, iPhone app tracking (enable, set up, revoke), logs, exit.
+folder, settings, start with Windows, iPhone app tracking (iCloud log status, read now, open folder), logs, exit.
 
 **Tray icon** (the recording indicator): red dot = recording · red with black square = recording, video blanked
 for privacy · grey pause = paused · orange = problem (hover for details).
@@ -101,7 +96,7 @@ locked, sleep, display off, private app, recorder not running, crash…).
 
 The **📱 iPhone apps** lane (once any iPhone event has arrived) shows one colour per app: solid = both "opened" and
 "closed" were received, faded + hatched = one end was inferred, a dashed line with a red dot = only one event is
-known (duration unknown, not counted). Its label shows when the phone last synced (⚠ after 12 h of silence). Hover a
+known (duration unknown, not counted). Its label shows when the PC last read a new event (⚠ after 12 h of silence). Hover a
 block for start, end, duration, source and confidence. **Summary → iPhone** shows per-app totals, missing events, and
 Windows + iPhone combined (including time when both were in use).
 
@@ -180,8 +175,9 @@ Changes are applied automatically when the file is saved (or via tray → Reload
 | `hardwareEncoding` | true | GPU H.264 encoder, with automatic software fallback. |
 | `recordOnLaunch` | true | Start recording when the recorder starts. |
 | `autoRestartAfterCrash` | true | Ask Windows to relaunch the recorder after a crash. |
-| `retentionDays` | 30 | Delete **video** older than this (0 = keep). The time records stay: which app/window, iPhone and phone-network records, pauses. Days without video still appear in the day list ("time records only") with their timeline rows and Summary. |
+| `retentionDays` | 30 | Delete **video** older than this (0 = keep). The time records stay: which app/window, iPhone records, pauses. Days without video still appear in the day list ("time records only") with their timeline rows and Summary. |
 | `aiWait.enabled` / `aiWait.idleSeconds` | true / 20 | Log time **waiting on AI tools** as "Waiting on AI" (not progress): no keyboard/mouse input for this long while an AI chat (ChatGPT, Claude, Gemini…, app or browser tab) is in front, or while Claude Code is working and an editor/terminal is in front. It's cut out of the window log, so Apps, Topics, Plan and the coach all see it. |
+| `iCloudLog.enabled` / `iCloudLog.folder` | true / "" | Read iPhone events from `LifeReplay*.txt` in the Shortcuts folder of iCloud Drive (empty = `%USERPROFILE%\iCloudDrive\iCloud~is~workflow~my~workflows`). |
 | `keepTimeRecordsDays` | 0 | Delete those time records after this many days (0 = keep forever; they take a few MB a year). |
 | `maxStorageGB` | 100 | Delete oldest recordings above this total (0 = no limit). |
 | `minFreeDiskGB` | 5 | Pause recording if the disk gets this full. |
@@ -192,8 +188,6 @@ Changes are applied automatically when the file is saved (or via tray → Reload
 | `hours.enabled` / `hours.start` / `hours.end` / `hours.weekdaysOnly` | false / 09:00 / 18:00 / false | Only record during these local hours. |
 | `logWindowTitles` | true | Log which app and window title (tab / document / file) is in front, for the viewer's **Summary** panel and "Apps / tabs" timeline lane. Only while recording; excluded windows appear as "(private)". |
 | `idleMinutes` | 5 | No input and no screen change for this long isn't counted as time on an app. |
-| `sync.enabled` / `sync.port` / `sync.bindAddress` | false / 47800 / 127.0.0.1 | iPhone app-usage endpoint. 127.0.0.1 = only reachable through Tailscale Serve on this PC. |
-| `phoneDns.enabled` / `phoneDns.upstream` | false / auto | DNS server on the PC's Tailscale address for phone app tracking without Shortcuts. `auto` forwards to the PC's DNS servers + 8.8.8.8 + 1.1.1.1 at once; or one IP. |
 
 ## Privacy and security
 
@@ -205,18 +199,15 @@ Changes are applied automatically when the file is saved (or via tray → Reload
   Apps that use `WDA_EXCLUDEFROMCAPTURE` are excluded by Windows itself.
 - Lock screen, UAC prompts and sleep are never recorded (Windows can't capture them, and LifeReplay pauses).
 - Delete by segment, session or day in the viewer; retention and quota clean up automatically.
-- iPhone app tracking: off by default; listens on 127.0.0.1 only and is reached through Tailscale Serve (valid
-  HTTPS certificate, your tailnet only, never the public internet). Every request needs a 256-bit token, stored only
-  as a hash on the PC. The API can only *add* app events; recordings can't be read over the network.
-  See [shared/sync-protocol.md](shared/sync-protocol.md).
+- iPhone app tracking: nothing listens on the network. The automations write to a file in your own iCloud Drive,
+  and the PC only reads it.
 - Anyone with access to your Windows account can read the recordings. Use BitLocker / device encryption for
   protection at rest.
 
 ## Repository layout
 
 ```
-desktop/   Windows: Core, Sync, Recorder (tray), Viewer (WPF), Tests
-shared/    iPhone event protocol
+desktop/   Windows: Core, Analysis, Coach, Recorder (tray), Viewer (WPF), CoachTray, Tests
 docs/      architecture, testing, iPhone Shortcuts setup
 build.ps1  test + publish
 ```

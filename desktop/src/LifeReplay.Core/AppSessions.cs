@@ -11,8 +11,6 @@ public enum SessionConfidence
     StartInferred,
     /// <summary>Only one side is known and nothing nearby bounds the other: the duration is unknown.</summary>
     Unknown,
-    /// <summary>No open/close events: estimated from the phone's network lookups (<see cref="NetworkSessions"/>).</summary>
-    Estimated,
 }
 
 public sealed record AppSession(

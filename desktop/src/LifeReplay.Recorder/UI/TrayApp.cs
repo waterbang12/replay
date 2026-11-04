@@ -15,7 +15,7 @@ internal sealed class TrayApp : ApplicationContext
     private readonly string? _dataDirArg;
     private readonly NotifyIcon _tray;
     private readonly ContextMenuStrip _menu;
-    private readonly ToolStripMenuItem _statusItem, _storageItem, _pauseItem, _pause15, _pause60, _blankItem, _autoStartItem, _syncEnabledItem, _syncPairItem, _syncStatusItem, _icloudStatusItem;
+    private readonly ToolStripMenuItem _statusItem, _storageItem, _pauseItem, _pause15, _pause60, _blankItem, _autoStartItem, _icloudStatusItem;
     private readonly System.Windows.Forms.Timer _refresh;
     private Hotkey _hotkey;
     private SettingsForm? _settings;
@@ -66,17 +66,13 @@ internal sealed class TrayApp : ApplicationContext
         _blankItem = new ToolStripMenuItem("Black out video (privacy)", null, async (_, _) => await _host.Controller.SetManualBlankAsync(!_host.Controller.ManualBlank))
         { ToolTipText = "Keeps the timeline running but records black frames until you turn it off" };
         _autoStartItem = new ToolStripMenuItem("Start with Windows", null, (_, _) => ToggleAutoStart()) { Checked = AutoStart.IsEnabled() };
-        _syncStatusItem = new ToolStripMenuItem("") { Enabled = false };
-        _syncEnabledItem = new ToolStripMenuItem("Enable iPhone app tracking", null, async (_, _) => await ToggleSync());
-        _syncPairItem = new ToolStripMenuItem("Set up iPhone (new token)...", null, (_, _) => ShowPairing());
+        // iPhone app tracking: Shortcuts automations append to a log file in iCloud Drive (docs/iphone-shortcuts.md).
         var syncMenu = new ToolStripMenuItem("iPhone app tracking");
         _icloudStatusItem = new ToolStripMenuItem("") { Enabled = false };
         syncMenu.DropDownItems.AddRange([
             _icloudStatusItem,
-            new ToolStripMenuItem("Track phone apps without Shortcuts (network)...", null, (_, _) => ShowPhoneDns()) { Font = new Font(_menu.Font, FontStyle.Bold) },
-            new ToolStripSeparator(),
-            _syncStatusItem, _syncEnabledItem, _syncPairItem,
-            new ToolStripMenuItem("Revoke all paired iPhones", null, (_, _) => RevokePairings())]);
+            new ToolStripMenuItem("Read the iCloud log now", null, (_, _) => Task.Run(_host.ICloudLog.Check)),
+            new ToolStripMenuItem("Open the iCloud log folder", null, (_, _) => Shell(ICloudLogImporter.DefaultFolder()))]);
 
         _menu.Items.AddRange([
             _statusItem, _storageItem, new ToolStripSeparator(),
@@ -137,16 +133,11 @@ internal sealed class TrayApp : ApplicationContext
         _pause15.Visible = _pause60.Visible = !c.UserPaused;
         _blankItem.Checked = c.ManualBlank;
         _autoStartItem.Checked = AutoStart.IsEnabled(); // can change outside the app (settings window, scripts)
-        var sync = _host.Sync;
-        _syncEnabledItem.Checked = _host.Config.Sync.Enabled;
         var ic = _host.ICloudLog;
         _icloudStatusItem.Text = !_host.Config.ICloudLog.Enabled ? "iCloud log: off"
             : ic.LastReadUtcMs is { } read ? $"iCloud log: read {TimeUtil.ToLocal(read):HH:mm}" + (ic.LastError != null ? " ⚠ " + ic.LastError : "")
             : Directory.Exists(ICloudLogImporter.DefaultFolder()) ? "iCloud log: waiting for LifeReplay.txt" : "iCloud log: iCloud Drive not found";
         if (_icloudStatusItem.Text.Length > 120) _icloudStatusItem.Text = _icloudStatusItem.Text[..120] + "…";
-        _syncStatusItem.Text = sync != null ? $"Listening on port {sync.Port} · {_host.Pairing.Devices.Count} paired" :
-            _host.SyncError != null ? $"Error: {_host.SyncError}" : "Off";
-        _syncPairItem.Enabled = sync != null;
 
         if (iconKey != _lastIconKey)
         {
@@ -209,46 +200,6 @@ internal sealed class TrayApp : ApplicationContext
             Log.Info($"Start with Windows: {_autoStartItem.Checked}");
         }
         catch (Exception ex) { MessageBox.Show(ex.Message, "LifeReplay"); }
-    }
-
-    private async Task ToggleSync()
-    {
-        bool enable = !_host.Config.Sync.Enabled;
-        if (enable && MessageBox.Show(
-                "This starts an encrypted (HTTPS) endpoint so your iPhone's Shortcuts can report which apps you open and close (no screen recording).\n\n" +
-                "It listens only on this PC (127.0.0.1); your phone reaches it through Tailscale Serve, which only your own devices can use. " +
-                "Every request needs the token from \"Set up iPhone…\".\n\nEnable iPhone app tracking?",
-                "LifeReplay", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
-        await _host.SetSyncEnabledAsync(enable);
-        RefreshUi();
-        if (_host.SyncError != null) MessageBox.Show("Sync could not start: " + _host.SyncError, "LifeReplay", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-    }
-
-    private void ShowPairing()
-    {
-        try
-        {
-            var (token, url, port) = _host.CreatePairing();
-            using var dlg = new PairingDialog(token, url, port);
-            dlg.ShowDialog();
-        }
-        catch (Exception ex) { Log.Error("Pairing failed", ex); MessageBox.Show(ex.Message, "LifeReplay"); }
-    }
-
-    private void ShowPhoneDns()
-    {
-        try
-        {
-            using var dlg = new PhoneDnsDialog(_host);
-            dlg.ShowDialog();
-        }
-        catch (Exception ex) { Log.Error("Phone DNS setup failed", ex); MessageBox.Show(ex.Message, "LifeReplay"); }
-    }
-
-    private void RevokePairings()
-    {
-        if (MessageBox.Show("Revoke access for all paired iPhones? They will need to be paired again.", "LifeReplay", MessageBoxButtons.YesNo) == DialogResult.Yes)
-            _host.Pairing.RevokeAll();
     }
 
     public static string? FindViewer()

@@ -48,7 +48,6 @@ internal sealed class RecordingController : IAsyncDisposable
     public string? BlankedBy { get; private set; }
     public long? PauseUntilMs => _pauseUntilMs;
     public RecorderConfig Config => _cfg;
-    public bool SyncEnabled { get; set; }
     public event Action? Changed;
 
     public IReadOnlyList<(string Name, EncodingPlan Plan, bool Hardware)> ActiveDisplays
@@ -515,7 +514,6 @@ internal sealed class RecordingController : IAsyncDisposable
                 EstimatedMaxBytesPerHour = EncodingPlan.EstimateMaxBytesPerHour(displays.Select(d => d.Plan)),
                 LastError = LastError,
                 Blanked = Blanked,
-                SyncEnabled = SyncEnabled,
             }.Save(_ctx.Paths.StatusPath);
         }
         catch (Exception ex) { Log.Warn("Writing status failed", ex); }

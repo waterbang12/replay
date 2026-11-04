@@ -353,7 +353,7 @@ public class ConfigTests
         Assert.True(File.Exists(t.Paths.ConfigPath));
         Assert.Equal(300, cfg.SegmentSeconds);
         Assert.Equal(10, cfg.Fps);
-        Assert.False(cfg.Sync.Enabled);
+        Assert.True(cfg.ICloudLog.Enabled);
     }
 
     [Fact]

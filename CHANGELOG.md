@@ -6,34 +6,6 @@ Each entry says what changed and why it was needed.
 
 Plain-language notes on how things work, and what to do when they don't.
 
-### Phone tracking without Shortcuts: how it works
-- **Lookups:** whenever an app on your phone needs a server ("where is youtube.com?"), the phone asks a DNS
-  server. Tailscale sends that question to **two places at once**: your PC (its Tailscale address, 100.x.x.x) and Cloudflare.
-  - The first answer is used, so the phone works even when the PC is off.
-  - The PC passes the question on (to the Wi-Fi's DNS, 8.8.8.8 and 1.1.1.1) and writes down the time if the name
-    belongs to a known app (YouTube, Instagram, KakaoTalk…). Everything else is passed on and not saved.
-- **Sessions:** several lookups for the same app close together become one "≈" session on the 📱 row. They're
-  estimates, not exact times.
-- **Times:** they come from the PC's clock when the question arrives. The phone stores nothing, so there is no
-  queue: **time when the PC can't hear the phone is simply missing.**
-
-### Phone tracking and network changes
-
-| What changes | Phone internet | Recording |
-|---|---|---|
-| Phone switches Wi-Fi ↔ LTE/5G | works | Continues after Tailscale reconnects (usually a few seconds). Lookups in those seconds go only to Cloudflare and are missed. |
-| Phone turns Tailscale off, or iOS stops it | works (normal DNS) | **Stops** until Tailscale is on again. Turn on VPN On Demand in the Tailscale app. |
-| PC is off, asleep, or LifeReplay isn't running | works (Cloudflare answers) | **Stops**. Nothing is saved for that time. |
-| PC changes network (home ↔ campus) | works | The PC's Tailscale address (100.x.x.x) stays the same. The Wi-Fi's DNS servers are re-read every 30 s. A health check restarts the listener if needed: 15 s after wake-up or a network change, and every minute anyway. |
-| Campus/hotel Wi-Fi with a login page | may need a moment | If the login page won't open, turn Tailscale off on the phone, log in, then turn it back on. |
-
-- **Check it's working:** tray → iPhone app tracking → Track phone apps without Shortcuts. The bottom line shows
-  the last request from the phone.
-- **Phone internet broken while Tailscale is on:** in the Tailscale admin DNS page, make sure **Cloudflare** is
-  listed next to the PC address. To undo everything there, remove the PC address and turn off "Override DNS
-  servers".
-- Not yet tested on a real iPhone, and the restart after network changes isn't tested on a real network change.
-
 ### iPhone via iCloud file (current setup)
 - Each automation adds one line to `LifeReplay.txt` in iCloud Drive (Shortcuts folder). The PC reads it every 30 s.
 - **Nothing is lost when the PC is off.** The lines wait in iCloud and are read when the PC is on again.
@@ -42,14 +14,6 @@ Plain-language notes on how things work, and what to do when they don't.
   line it couldn't read. Usually the date format: tap the Current Date variable → ISO 8601.
 - If nothing arrives, check that iCloud Drive is on, on both the iPhone and the PC.
 
-### Shortcuts (one address per automation)
-- Each automation opens one address. The PC records the time **when it arrives**. If the PC is off or Tailscale is
-  off on the phone, that open/close is lost and the viewer shows the session as "inferred" or "unknown".
-- Setup page again: tray → iPhone app tracking → Set up iPhone (new token)… → scan the QR. A new QR makes a new
-  key, and the automations you already made keep working (old keys stay valid until "Revoke all paired iPhones").
-- After "Revoke all paired iPhones", every automation's address stops working, so you'd paste new addresses.
-- "Is Closed" may not fire when you lock the phone. That's an iOS limit; the session then ends when the next app opens.
-
 ### "Waiting on AI"
 - 20 s without keyboard or mouse input while an AI chat is in front, or while Claude Code works with VS Code or a
   terminal in front, counts as "Waiting on AI". That's **not progress**.
@@ -57,19 +21,11 @@ Plain-language notes on how things work, and what to do when they don't.
 - Change the 20 s with `aiWait.idleSeconds` in config.json, or turn it off with `aiWait.enabled: false`.
 - Codex CLI and other agents aren't detected yet. Only their chat windows are.
 
-### The Windows Firewall rule
-- One rule, named **"LifeReplay phone DNS"**. It lets incoming DNS questions (UDP port 53) reach
-  **LifeReplay.exe only**, and only **from Tailscale addresses (100.64.0.0/10)**, which are your own devices. The
-  firewall stays on for everything else.
-- If the setup window says "⚠ 예전 규칙" (old rule): click 방화벽 허용하기 once to replace it with the stricter one.
-- To remove it, open an admin terminal and run `netsh advfirewall firewall delete rule name="LifeReplay phone DNS"`.
-  Or: Windows Defender Firewall → Advanced settings → Inbound Rules → delete "LifeReplay phone DNS".
-
 ### Is it real time?
 - **Screen video:** saved in 5-minute files, so the replay can be up to 5 minutes behind. `segmentSeconds` in
   config.json changes this.
-- **Phone apps:** saved every 10 s, and the viewer refreshes every 30 s, so they appear within about 40 s. A session
-  shows up after 3 lookups; its end time settles a few minutes after you stop.
+- **Phone apps:** iCloud syncs the log file in a few minutes; the recorder reads it every 30 s and the viewer
+  refreshes every 30 s.
 
 ### Storage
 - **Video** is deleted after 7 days (`retentionDays`). At the current quality that's about 30–40 GB.
@@ -112,8 +68,8 @@ the replay of a race in a racing game.
   - Shortcuts can't log location continuously. It only runs on events like arriving at or leaving a place, or at
     set times.
   - Open-source iOS loggers can POST batches of locations to an HTTP endpoint: **Overland** (by Aaron Parecki) and
-    **OwnTracks** (HTTP mode). That fits the existing iPhone endpoint and token: a new `POST /api/v1/locations`
-    with the same validation and dedupe.
+    **OwnTracks** (HTTP mode). That would need an HTTPS endpoint again (removed in 0.8.0), or a file in iCloud
+    Drive the way app events work now.
   - Google Maps Timeline can be exported as JSON and imported afterwards.
 - **Replay view:**
   - a map with the day's path drawn progressively in sync with the timeline playhead;
@@ -166,9 +122,24 @@ the replay of a race in a racing game.
 - **Folder and code:** rename the folder (`life_replay`), the solution and projects, the exe names, the tray and
   window titles, and the data folder `%LOCALAPPDATA%\LifeReplay`.
   - The data folder needs a careful move: database, recordings, config, iPhone key.
-  - Autostart (HKCU Run), the coach tray's Run entry, mutex names, the firewall rule and the Tailscale Serve
-    target would all need updating.
+  - Autostart (HKCU Run), the coach tray's Run entry, mutex names, and the iCloud log path would need
+    updating.
   - Not started: it means stopping recording and moving all data, so it needs a planned time.
+
+## 0.8.0 — 2026-11-04
+
+- **Removed the network methods for iPhone tracking.** *Why:* the iCloud log works, including while the PC is off,
+  and the network methods lost events whenever the PC or Tailscale was unreachable.
+  - Gone: phone DNS tracking (forwarder, firewall-rule setup, `dns_hits`, dropped in schema v9), the HTTPS endpoint
+    (`/api/v1/app-events`, `/api/v1/e`), the phone setup page and pairing QR code, tokens and the TLS certificate.
+    The whole `LifeReplay.Sync` project and the QRCoder dependency are removed.
+  - On this PC: Tailscale Serve reset, the certificate removed from the user store, and the `sync` folder deleted.
+  - iPhone events already received stay in the database.
+  - The tray's iPhone menu shows the iCloud log status, "Read the iCloud log now" and "Open the iCloud log folder".
+- **Repeated "closed" events are dropped for every app**, not only YouTube (a test covers Instagram and Discord).
+- Docs: docs/iphone-shortcuts.md rewritten for the iCloud method only; phone-network-tracking.md and
+  shared/sync-protocol.md removed.
+- Tests: 172 (the DNS and HTTPS endpoint tests went with the code).
 
 ## 0.7.3 — 2026-11-04
 

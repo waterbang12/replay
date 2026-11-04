@@ -156,7 +156,7 @@ public sealed class TimelineControl : FrameworkElement
     private double LaneTop(int i) => AxisHeight + i * (LaneHeight + LaneGap);
 
     // The iPhone lane is shown once any iPhone event was ever received, so an empty day visibly means "nothing synced".
-    private static bool HasPhoneLane(DayTimeline d) => d.PhoneSessions.Count > 0 || d.PhoneStatus.Count > 0 || d.PhoneLastNetworkMs != null;
+    private static bool HasPhoneLane(DayTimeline d) => d.PhoneSessions.Count > 0 || d.PhoneStatus.Count > 0;
     private int PhoneLaneIndex => _data!.Lanes.Count + (_data.Focus.Count > 0 ? 1 : 0);
     private static readonly Brush InferredHatch = MakeHatch(Color.FromArgb(0x70, 0x1F, 0x1F, 0x22));
     private static readonly Brush WarnBrush = Freeze(new SolidColorBrush(Color.FromRgb(0xF5, 0xB7, 0x3B)));
@@ -164,8 +164,7 @@ public sealed class TimelineControl : FrameworkElement
     /// <summary>"synced 14:02" / "last sync 2 d ago" for the lane label; warn when nothing arrived for 12 h.</summary>
     internal static (string Text, bool Stale) PhoneSyncText(DayTimeline d)
     {
-        long? newest = d.PhoneStatus.LastReceivedUtcMs is { } a && d.PhoneLastNetworkMs is { } b ? Math.Max(a, b) : d.PhoneStatus.LastReceivedUtcMs ?? d.PhoneLastNetworkMs;
-        if (newest is not { } last) return ("no events yet", true);
+        if (d.PhoneStatus.LastReceivedUtcMs is not { } last) return ("no events yet", true);
         long age = d.NowMs - last;
         var local = TimeUtil.ToLocal(last);
         string when = age < 86_400_000 && local.Date == TimeUtil.ToLocal(d.NowMs).Date ? local.ToString("HH:mm") : local.ToString("MMM d HH:mm");
@@ -285,8 +284,7 @@ public sealed class TimelineControl : FrameworkElement
             dc.Pop();
         }
 
-        // iPhone apps lane: solid = opened+closed seen (Shortcuts), faded+hatched = one end inferred or estimated from
-        // network lookups,
+        // iPhone apps lane (Shortcuts events): solid = opened+closed seen, faded+hatched = one end inferred,
         // small dashed marker = only one event known (duration unknown, not counted).
         if (HasPhoneLane(_data))
         {
@@ -509,7 +507,6 @@ public sealed class TimelineControl : FrameworkElement
         SessionConfidence.Complete => "complete (opened + closed)",
         SessionConfidence.EndInferred => "end inferred (no closed event)",
         SessionConfidence.StartInferred => "start inferred (no opened event)",
-        SessionConfidence.Estimated => "estimated from network lookups",
         _ => "incomplete (duration unknown)",
     };
 
