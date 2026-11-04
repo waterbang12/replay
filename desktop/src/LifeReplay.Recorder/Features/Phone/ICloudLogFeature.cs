@@ -1,6 +1,6 @@
 using LifeReplay.Core;
 
-namespace LifeReplay.Recorder;
+namespace LifeReplay.Recorder.Features.Phone;
 
 /// <summary>
 /// Reads the log file(s) that the iPhone's Shortcuts automations append to in iCloud Drive
@@ -9,7 +9,7 @@ namespace LifeReplay.Recorder;
 /// Re-reading is harmless: event ids come from app + event + second, so known lines are duplicates.
 /// The phone writes the time, so events made while the PC was off arrive with their real times.
 /// </summary>
-internal sealed class ICloudLogImporter : IDisposable
+internal sealed class ICloudLogFeature : IRecorderFeature
 {
     private readonly RecorderHost _host;
     private readonly System.Threading.Timer _timer;
@@ -20,11 +20,15 @@ internal sealed class ICloudLogImporter : IDisposable
     public long? LastReadUtcMs { get; private set; }
     public string? LastError { get; private set; }
 
-    public ICloudLogImporter(RecorderHost host)
+    public string Name => "iPhone iCloud log";
+
+    public ICloudLogFeature(RecorderHost host)
     {
         _host = host;
-        _timer = new System.Threading.Timer(_ => Check(), null, 5_000, 30_000);
+        _timer = new System.Threading.Timer(_ => Check(), null, Timeout.Infinite, Timeout.Infinite);
     }
+
+    public void Start() => _timer.Change(5_000, 30_000);
 
     public static string DefaultFolder() =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "iCloudDrive", "iCloud~is~workflow~my~workflows");

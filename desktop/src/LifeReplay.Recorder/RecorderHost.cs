@@ -1,4 +1,8 @@
 using LifeReplay.Core;
+using LifeReplay.Recorder.Features;
+using LifeReplay.Recorder.Features.AiWait;
+using LifeReplay.Recorder.Features.Phone;
+using LifeReplay.Recorder.Features.WindowLog;
 using LifeReplay.Recorder.Recording;
 using LifeReplay.Recorder.UI;
 using Microsoft.Win32;
@@ -17,11 +21,12 @@ internal sealed class RecorderHost : IAsyncDisposable
     public string DeviceId { get; }
     public RecordingController Controller { get; }
     public RecorderConfig Config { get; private set; }
-    public ICloudLogImporter ICloudLog { get; }
+    /// <summary>The optional parts of the recorder, in start order (see <see cref="CreateFeatures"/>).</summary>
+    public IReadOnlyList<IRecorderFeature> Features { get; }
+    public ICloudLogFeature? ICloudLog => Features.OfType<ICloudLogFeature>().FirstOrDefault();
 
     private readonly ExclusionWatcher _exclusions;
     private readonly DisplayPowerWatcher _displayPower;
-    private readonly FocusTracker _focus;
     private readonly FileSystemWatcher _configWatcher;
     private readonly System.Windows.Forms.Timer _configDebounce;
     private readonly bool _persistConfig;
@@ -35,7 +40,6 @@ internal sealed class RecorderHost : IAsyncDisposable
         Config = cfg;
         _persistConfig = persistConfig;
         Controller = new RecordingController(new RecorderContext(store, paths, deviceId), cfg);
-        ICloudLog = new ICloudLogImporter(this);
 
         SystemEvents.PowerModeChanged += OnPowerModeChanged;
         SystemEvents.SessionSwitch += OnSessionSwitch;
@@ -44,7 +48,7 @@ internal sealed class RecorderHost : IAsyncDisposable
 
         _exclusions = new ExclusionWatcher(() => Config);
         _exclusions.Changed += match => _ = Controller.SetExclusionAsync(match);
-        _focus = new FocusTracker(this);
+        Features = CreateFeatures();
         _displayPower = new DisplayPowerWatcher();
         _displayPower.DisplayOffChanged += off => _ = Controller.SetDisplayOffAsync(off);
 
@@ -62,6 +66,31 @@ internal sealed class RecorderHost : IAsyncDisposable
     {
         _exclusions.Check();
         await Controller.StartAsync();
+        foreach (var f in Features)
+            try { f.Start(); Log.Info($"Feature started: {f.Name}"); }
+            catch (Exception ex) { Log.Error($"Feature {f.Name} failed to start (recording continues)", ex); }
+    }
+
+    /// <summary>
+    /// The optional parts of the recorder. To add a feature, implement <see cref="IRecorderFeature"/> in its own folder
+    /// under Features/ and add one line here; to remove one, delete its line and folder.
+    /// </summary>
+    private List<IRecorderFeature> CreateFeatures()
+    {
+        var windowLog = new WindowLogFeature(this);
+        return
+        [
+            windowLog,                          // which app/window is in front (focus_events)
+            new AiWaitFeature(this, windowLog), // "Waiting on AI" (ai_waits), from the window log's samples
+            new ICloudLogFeature(this),         // iPhone app events from the Shortcuts log in iCloud Drive
+        ];
+    }
+
+    private void NotifyConfigChanged(RecorderConfig cfg)
+    {
+        foreach (var f in Features)
+            try { f.ConfigChanged(cfg); }
+            catch (Exception ex) { Log.Error($"Feature {f.Name} failed to apply the new settings", ex); }
     }
 
     public async Task ReloadConfigAsync()
@@ -72,6 +101,7 @@ internal sealed class RecorderHost : IAsyncDisposable
             if (cfg.LoadWarning != null) Log.Warn(cfg.LoadWarning);
             Config = cfg;
             await Controller.ApplyConfigAsync(cfg);
+            NotifyConfigChanged(cfg);
             _exclusions.Check();
         }
         catch (Exception ex) { Log.Error("Reloading config failed", ex); }
@@ -84,6 +114,7 @@ internal sealed class RecorderHost : IAsyncDisposable
         Config = cfg;
         SaveConfig();
         await Controller.ApplyConfigAsync(cfg);
+        NotifyConfigChanged(cfg);
         _exclusions.Check();
     }
 
@@ -140,11 +171,12 @@ internal sealed class RecorderHost : IAsyncDisposable
         SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
         SystemEvents.SessionEnding -= OnSessionEnding;
         _exclusions.Dispose();
-        _focus.Dispose();
         _displayPower.Dispose();
         _configWatcher.Dispose();
         _configDebounce.Dispose();
-        ICloudLog.Dispose();
+        // Stop features in reverse order, so a feature stops before the ones it listens to.
+        foreach (var f in Features.Reverse())
+            try { f.Dispose(); } catch (Exception ex) { Log.Warn($"Feature {f.Name} failed to stop", ex); }
         await Controller.DisposeAsync();
     }
 }

@@ -1,3 +1,4 @@
+using LifeReplay.Recorder.Features.Phone;
 ﻿using System.Diagnostics;
 using System.Drawing.Drawing2D;
 using LifeReplay.Core;
@@ -71,8 +72,8 @@ internal sealed class TrayApp : ApplicationContext
         _icloudStatusItem = new ToolStripMenuItem("") { Enabled = false };
         syncMenu.DropDownItems.AddRange([
             _icloudStatusItem,
-            new ToolStripMenuItem("Read the iCloud log now", null, (_, _) => Task.Run(_host.ICloudLog.Check)),
-            new ToolStripMenuItem("Open the iCloud log folder", null, (_, _) => Shell(ICloudLogImporter.DefaultFolder()))]);
+            new ToolStripMenuItem("Read the iCloud log now", null, (_, _) => { if (_host.ICloudLog is { } log) Task.Run(log.Check); }),
+            new ToolStripMenuItem("Open the iCloud log folder", null, (_, _) => Shell(ICloudLogFeature.DefaultFolder()))]);
 
         _menu.Items.AddRange([
             _statusItem, _storageItem, new ToolStripSeparator(),
@@ -134,9 +135,9 @@ internal sealed class TrayApp : ApplicationContext
         _blankItem.Checked = c.ManualBlank;
         _autoStartItem.Checked = AutoStart.IsEnabled(); // can change outside the app (settings window, scripts)
         var ic = _host.ICloudLog;
-        _icloudStatusItem.Text = !_host.Config.ICloudLog.Enabled ? "iCloud log: off"
+        _icloudStatusItem.Text = ic == null || !_host.Config.ICloudLog.Enabled ? "iCloud log: off"
             : ic.LastReadUtcMs is { } read ? $"iCloud log: read {TimeUtil.ToLocal(read):HH:mm}" + (ic.LastError != null ? " ⚠ " + ic.LastError : "")
-            : Directory.Exists(ICloudLogImporter.DefaultFolder()) ? "iCloud log: waiting for LifeReplay.txt" : "iCloud log: iCloud Drive not found";
+            : Directory.Exists(ICloudLogFeature.DefaultFolder()) ? "iCloud log: waiting for LifeReplay.txt" : "iCloud log: iCloud Drive not found";
         if (_icloudStatusItem.Text.Length > 120) _icloudStatusItem.Text = _icloudStatusItem.Text[..120] + "…";
 
         if (iconKey != _lastIconKey)

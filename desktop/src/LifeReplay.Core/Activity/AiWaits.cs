@@ -112,3 +112,11 @@ public static class AiTools
     private static FocusRecord Piece(FocusRecord f, long start, long end) =>
         new() { Id = f.Id, DeviceId = f.DeviceId, StartUtcMs = start, EndUtcMs = end, Process = f.Process, Title = f.Title };
 }
+
+/// <summary>Logs time waiting on AI tools as "Waiting on AI" (not progress). See <see cref="AiTools"/>.</summary>
+public sealed class AiWaitSettings
+{
+    public bool Enabled { get; set; } = true;
+    /// <summary>No keyboard/mouse input for this long (while an AI tool is in front or working) starts a wait.</summary>
+    public int IdleSeconds { get; set; } = 20;
+}

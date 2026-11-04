@@ -1,6 +1,6 @@
 using LifeReplay.Core;
 
-namespace LifeReplay.Recorder.UI;
+namespace LifeReplay.Recorder.Features.AiWait;
 
 /// <summary>
 /// Whether Claude Code is working right now. It watches the transcripts in %USERPROFILE%\.claude\projects (JSON Lines,

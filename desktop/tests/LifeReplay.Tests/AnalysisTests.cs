@@ -137,16 +137,6 @@ public class DayAnalysisTests
     }
 
     [Theory]
-    [InlineData("Google Chrome", "lofi beats - YouTube", "YouTube")]
-    [InlineData("KakaoTalk", "KakaoTalk", "Social")]
-    [InlineData("Google Chrome", "Home / X", "Social")]
-    [InlineData("Google Chrome", "r/math - Reddit", "Social")]
-    [InlineData("Google Chrome", "pwn.college - Program Misuse", "Other")]
-    [InlineData("VS Code", "exploit.py - pwn-notes", "Other")]
-    public void FixedCategoriesFromAppAndTitle(string app, string item, string expected) =>
-        Assert.Equal(expected, FixedCategories.Of(new TitleItem(app, item, 1, 0)));
-
-    [Theory]
     [InlineData("Google Chrome", "검은화면 [유튜브 알람] 1시간 뒤에 깨워드릴게요 - YouTube", "not_progress")]
     [InlineData("Google Chrome", "All Phillip Graves Cutscenes - Call of Duty - YouTube", "not_progress")]
     [InlineData("Google Chrome", "MIT 6.006 Lecture 3 - YouTube", "progress")]
@@ -155,8 +145,18 @@ public class DayAnalysisTests
     [InlineData("Google Chrome", "pwn.college - Program Misuse", "progress")]
     [InlineData("VS Code", "exploit.py - pwn-notes", "progress")]
     [InlineData("Google Chrome", "ChatGPT", "unsorted")]
+    [InlineData("Google Chrome", "Home / X", "not_progress")]
+    [InlineData("Google Chrome", "r/math - Reddit", "not_progress")]
+    [InlineData("Google Chrome", "메일쓰기 : 메일", "unsorted")]
     public void ProgressRulesFromAppAndTitle(string app, string item, string expected) =>
         Assert.Equal(expected, ProgressKinds.Rule(new TitleItem(app, item, 1, 0)));
+
+    [Fact]
+    public void TheDecidingRuleIsNamed()
+    {
+        Assert.Equal("YouTube", ProgressRules.Match(new TitleItem("Google Chrome", "lofi beats - YouTube", 1, 0))!.Name);
+        Assert.Null(ProgressRules.Match(new TitleItem("Google Chrome", "메일쓰기 : 메일", 1, 0)));
+    }
 
     [Fact]
     public void CategorizeSortsByKindThenClustersEachKind()

@@ -120,3 +120,11 @@ public static partial class AppEvents
         return true;
     }
 }
+
+/// <summary>iPhone events from a log file in iCloud Drive that Shortcuts automations append to (docs/iphone-shortcuts.md).</summary>
+public sealed class ICloudLogSettings
+{
+    public bool Enabled { get; set; } = true;
+    /// <summary>Folder with the LifeReplay*.txt log; empty = the Shortcuts folder in iCloud Drive.</summary>
+    public string Folder { get; set; } = "";
+}

@@ -38,7 +38,7 @@ public static class Retention
     }
 }
 
-/// <summary>Deletes recordings from disk and database. Used by retention, the viewer and the sync ingest.</summary>
+/// <summary>Deletes recordings from disk and database. Used by retention and the viewer.</summary>
 public static class RecordingDeleter
 {
     public sealed record Result(int Deleted, int Skipped, long BytesFreed);

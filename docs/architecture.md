@@ -4,16 +4,42 @@
 
 ```
 desktop/
-  src/LifeReplay.Core      .NET 10 library: SQLite store + migrations, MP4 integrity check, crash recovery,
-                           retention, day timeline/gap model, iPhone app events (from the iCloud log) + session rebuilding
-                           (AppEvents, AppSessions), config, logging. No Windows APIs.
+  src/LifeReplay.Core      .NET 10 library, no Windows APIs. One folder per area:
+    Storage/                 MetadataStore (connection, devices, sessions) + Migrations; analysis caches
+    Recording/               segments/gaps/thumbnails tables, MP4 check, crash recovery, retention, encoding plan
+    Activity/                window log (focus_events), "Waiting on AI" (ai_waits), FocusSummary
+    Phone/                   iPhone app events from the iCloud log (AppEvents), session rebuild (AppSessions)
+    Config/                  RecorderConfig (each feature's settings class lives in that feature's folder)
+    Timeline/                DayTimeline: one day's lanes and gaps for the viewer
+  src/LifeReplay.Analysis  On-device language model (Model/), topics and plan matching (DayAnalysis),
+                           todo list (Plan/), Progress / Not progress rules (Progress/ProgressRules.cs).
   src/LifeReplay.Recorder  LifeReplay.exe: tray app + capture/encode pipeline (WinForms, WinRT, Direct3D 11).
+    Features/                optional parts behind IRecorderFeature: WindowLog/, AiWait/, Phone/
   src/LifeReplay.Viewer    LifeReplay.Viewer.exe: WPF replay app (calendar, timeline, multi-screen playback).
+    Summary/                 one file per Summary view (Apps, Topics, Plan, iPhone, Coach) + SummaryPanel
   src/LifeReplay.Coach     Coach library: deterministic schedule evaluator, notification rules, sanitized context,
                            OpenAI Responses provider, answer validator, audit log/budget (see docs/coach.md).
   src/LifeReplay.CoachTray LifeReplay.CoachTray.exe: separate tray process for coach notifications.
   tests/LifeReplay.Tests   xUnit tests for Core, Analysis and Coach.
 ```
+
+### Adding or removing a feature
+
+- **Recorder feature** (something that runs while recording):
+  - Put a class implementing `IRecorderFeature` in `Recorder/Features/<Name>/`.
+  - Add one line to `RecorderHost.CreateFeatures()`.
+  - It gets `Start()`, `ConfigChanged()` and `Dispose()`. To react to the window in front, subscribe to
+    `WindowLogFeature.Sampled`, as `AiWaitFeature` does.
+  - A feature that throws is logged; recording continues.
+- **Its data:**
+  - Add a migration at the end of `Core/Storage/Migrations.cs`. Never edit a shipped one; removing a feature means
+    a new migration that drops its table.
+  - Put a `MetadataStore.<Feature>.cs` partial in the feature's Core folder.
+  - Put its settings class next to it, with one property on `RecorderConfig`.
+- **Viewer Summary view:**
+  - Add a RadioButton in `MainWindow.xaml` and a file in `Viewer/Summary/` with the Render method.
+  - Add one line to `SummaryViews` in `Summary/SummaryPanel.cs`.
+- **Classification:** all built-in Progress / Not progress rules are in `Analysis/Progress/ProgressRules.cs`.
 
 The recorder and the viewer are separate processes. A viewer crash can't stop recording, and the viewer
 works while the recorder is off. They share only the data folder: SQLite (WAL mode, so both can use it at once),

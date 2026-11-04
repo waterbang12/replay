@@ -126,6 +126,20 @@ the replay of a race in a racing game.
     updating.
   - Not started: it means stopping recording and moving all data, so it needs a planned time.
 
+## 0.8.1 — 2026-11-04
+
+- **Code reorganized by feature. Behaviour is unchanged.** *Why:* to add or remove a feature in one place.
+  - **Core:** folders Storage/, Recording/, Activity/, Phone/, Config/, Timeline/. `MetadataStore` is split into a
+    partial file per feature, and each feature's settings class sits next to its code.
+  - **Recorder:** optional parts implement `IRecorderFeature`: the window log, "Waiting on AI" (now separate, fed by
+    the window log's `Sampled` event) and the iCloud log. They're listed in `RecorderHost.CreateFeatures()`. A
+    feature that fails is logged and recording continues.
+  - **Viewer:** one file per Summary view in Summary/, listed in `SummaryViews`.
+  - **Analysis:** all Progress / Not progress rules are in one ordered, named table,
+    `Progress/ProgressRules.cs`. `FixedCategories` merged into it. Folders Model/, Plan/ and Progress/.
+  - docs/architecture.md: new module map and an "Adding or removing a feature" checklist.
+- Tests: 170 (the old FixedCategories tests are replaced by rule tests).
+
 ## 0.8.0 — 2026-11-04
 
 - **Removed the network methods for iPhone tracking.** *Why:* the iCloud log works, including while the PC is off,

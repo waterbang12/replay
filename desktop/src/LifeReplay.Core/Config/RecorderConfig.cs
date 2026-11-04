@@ -156,20 +156,3 @@ public sealed class RecordingHours
 
     public string Describe() => Enabled ? $"{Start}–{End}{(WeekdaysOnly ? ", Mon–Fri" : "")}" : "all day";
 }
-
-
-/// <summary>Logs time waiting on AI tools as "Waiting on AI" (not progress). See <see cref="AiTools"/>.</summary>
-public sealed class AiWaitSettings
-{
-    public bool Enabled { get; set; } = true;
-    /// <summary>No keyboard/mouse input for this long (while an AI tool is in front or working) starts a wait.</summary>
-    public int IdleSeconds { get; set; } = 20;
-}
-
-/// <summary>iPhone events from a log file in iCloud Drive that Shortcuts automations append to (docs/iphone-shortcuts.md).</summary>
-public sealed class ICloudLogSettings
-{
-    public bool Enabled { get; set; } = true;
-    /// <summary>Folder with the LifeReplay*.txt log; empty = the Shortcuts folder in iCloud Drive.</summary>
-    public string Folder { get; set; } = "";
-}
