@@ -68,11 +68,18 @@ public static class AppSessions
 
         var sessions = new List<AppSession>();
         AppEvent? open = null;          // the currently open app's "opened" event
+        // Last event type per app. A "closed" for an app that is already closed changes nothing and is dropped,
+        // like a duplicate TCP segment (iOS repeats "closed", e.g. when a Screen Time limit blocks the app).
+        var lastType = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         bool duplicateOpen = false;
         long? previousTs = null;        // timestamp of the event before the current one
         for (int i = 0; i < events.Count; i++)
         {
             var e = events[i];
+            bool alreadyClosed = lastType.TryGetValue(e.App, out var before) && before == AppEvents.Closed;
+            lastType[e.App] = e.Type;
+            if (e.Type == AppEvents.Closed && alreadyClosed && !(open != null && string.Equals(open.App, e.App, StringComparison.OrdinalIgnoreCase)))
+                continue;
             string? skew = e.TsUtcMs - e.ReceivedUtcMs > ClockSkewNoteMs ? "phone clock ahead of PC" : null;
             if (e.Type == AppEvents.Opened)
             {

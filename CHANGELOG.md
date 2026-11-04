@@ -170,6 +170,14 @@ the replay of a race in a racing game.
     target would all need updating.
   - Not started: it means stopping recording and moving all data, so it needs a planned time.
 
+## 0.7.3 — 2026-11-04
+
+- **A repeated "closed" for an app that's already closed is dropped.** *Why:* with a Screen Time limit, iOS sends
+  "YouTube closed" again 5–12 s after the first one. It showed up as a "closed without opened" missing event. The
+  session rebuild already tracks which app is open; it now also remembers each app's last event type and skips a
+  close that changes nothing, like a duplicate TCP segment.
+- Tests: 194.
+
 ## 0.7.2 — 2026-11-03
 
 - **The viewer opens only once.** *Why:* double-clicking the tray icon again opened a second window. A second

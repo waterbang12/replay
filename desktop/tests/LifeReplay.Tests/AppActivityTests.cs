@@ -128,6 +128,17 @@ public class AppSessionTests
     }
 
     [Fact]
+    public void RepeatedCloseOfAClosedAppIsDropped()
+    {
+        // A Screen Time limit blocks YouTube: iOS sends "closed" again 5 s later. It changes nothing.
+        var s = AppSessions.Reconstruct([
+            E("YouTube", "opened", "19:38:52"), E("YouTube", "closed", "19:38:54"), E("YouTube", "closed", "19:38:59"),
+            E("YouTube", "opened", "19:40:00"), E("YouTube", "closed", "19:45:00"),
+        ]);
+        Assert.Equal(["YouTube 19:38-19:38 Complete", "YouTube 19:40-19:45 Complete"], s.Select(Show).ToArray());
+    }
+
+    [Fact]
     public void ClosedAndOpenedAtTheSameSecondStillPair()
     {
         // Rapid switching: Instagram closes and KakaoTalk opens at the same timestamp; close is processed first.
